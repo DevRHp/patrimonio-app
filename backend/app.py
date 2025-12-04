@@ -4,6 +4,7 @@ import io
 from flask import Flask, render_template, request, send_file, jsonify
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
+from copy import copy
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -150,7 +151,7 @@ def verify():
                     new_cell.alignment = copy(cell.alignment)
 
         # Copy Missing Rows
-        from copy import copy
+        # from copy import copy (Removed local import)
         current_row_idx = 2
         for row in source_ws.iter_rows(min_row=2):
             # Check if this row represents a found item
