@@ -427,3 +427,35 @@ footer {
 .report-link:hover {
     text-decoration: underline;
 }
+
+/* Animation for Start Button */
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    50% { transform: scale(1.05); box-shadow: 0 6px 12px rgba(229, 9, 20, 0.4); }
+    100% { transform: scale(1); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+.action-buttons-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.bg-variant {
+    background: linear-gradient(135deg, #f5f5fa 0%, #e0e0ed 100%);
+}
+
+.link-style {
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.9rem;
+}
