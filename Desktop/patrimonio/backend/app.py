@@ -98,6 +98,20 @@ def delete_master():
     else:
         return jsonify({'error': 'Planilha não encontrada'}), 404
 
+@app.route('/get_master/<filename>', methods=['GET'])
+def get_master(filename):
+    if not session.get('is_admin'):
+        return jsonify({'error': 'Acesso negado.'}), 403
+    
+    # Security check: prevent directory traversal
+    if '..' in filename or filename.startswith('/'):
+        return jsonify({'error': 'Nome de arquivo inválido'}), 400
+
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True)
+    return jsonify({'error': 'Arquivo não encontrado'}), 404
+
 # --- Data Fetching ---
 
 @app.route('/get_rooms', methods=['POST'])
