@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SESI Sorocaba - Auditoria Patrimonial</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landing-page" class="landing-page">
+        <div class="landing-content">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="FabLab Logo" class="landing-logo">
+            <h1>Sistema de Auditoria Patrimonial</h1>
+            <p class="subtitle">SESI Sorocaba</p>
+            
+            <button id="btn-start" class="btn primary large">
+                <i class="fas fa-play"></i> Iniciar Auditoria
+            </button>
+        </div>
+
+        <div class="landing-footer">
+            <div class="developers">
+                <div class="role-group">
+                    <p class="role">Desenvolvedor</p>
+                    <p class="name">Rafael Henrique Prudenci</p>
+                </div>
+                <div class="role-group">
+                    <p class="role">Orientador</p>
+                    <p class="name">Marcelo Dias de Freitas Junior</p>
+                </div>
+                <div class="role-group">
+                    <p class="role">Técnico de Teatro</p>
+                    <p class="name">Leonardo Oliveira de Camargo</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" class="container hidden">
+        <header>
+            <div class="logo-area">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="FabLab Logo" class="logo">
+                <h1>Sistema de Auditoria Patrimonial</h1>
+                <p>SESI Sorocaba</p>
+            </div>
+        </header>
+
+        <main>
+            <!-- Step 1: Upload Master Spreadsheet -->
+            <section id="step-upload" class="card active">
+                <div class="card-header">
+                    <div class="step-number">1</div>
+                    <h2>Carregar Planilha Mãe</h2>
+                </div>
+                <div class="card-body">
+                    <p class="description">Faça o upload da planilha contendo todos os ativos e salas.</p>
+                    
+                    <div class="upload-area" id="drop-zone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Arraste o arquivo aqui ou clique para selecionar</p>
+                        <input type="file" id="file-input" accept=".xlsx" hidden>
+                    </div>
+                    <div id="file-name" class="file-name hidden"></div>
+
+                    <button id="btn-upload" class="btn primary" disabled>
+                        <i class="fas fa-arrow-right"></i> Continuar
+                    </button>
+                </div>
+            </section>
+
+            <!-- Step 2: Verification Details -->
+            <section id="step-verify" class="card disabled">
+                <div class="card-header">
+                    <div class="step-number">2</div>
+                    <h2>Dados da Auditoria</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="analyst-name">Nome do Analista</label>
+                        <input type="text" id="analyst-name" placeholder="Ex: João Silva">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="room-select">Sala em Análise</label>
+                        <select id="room-select" disabled>
+                            <option value="" selected disabled>Selecione uma sala...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="scanned-codes">Códigos Bipados</label>
+                        <textarea id="scanned-codes" placeholder="Cole aqui os códigos bipados (um por linha)..."></textarea>
+                    </div>
+
+                    <button id="btn-verify" class="btn success">
+                        <i class="fas fa-check-circle"></i> Verificar e Gerar Relatório
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 SESI Sorocaba - Todos os direitos reservados.</p>
+            <p>Suporte: devprudencio@gmail.com</p>
+        </footer>
+    </div>
+
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p>Processando...</p>
+    </div>
+
+    <script>
+        const landingPage = document.getElementById('landing-page');
+        const appContainer = document.getElementById('app-container');
+        const btnStart = document.getElementById('btn-start');
+        
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileNameDisplay = document.getElementById('file-name');
+        const btnUpload = document.getElementById('btn-upload');
+        const stepVerify = document.getElementById('step-verify');
+        const roomSelect = document.getElementById('room-select');
+        const btnVerify = document.getElementById('btn-verify');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        // Landing Page Logic
+        btnStart.addEventListener('click', () => {
+            landingPage.classList.add('fade-out');
+            setTimeout(() => {
+                landingPage.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                appContainer.classList.add('fade-in');
+            }, 500);
+        });
+
+        // Drag and Drop
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileName();
+            }
+        });
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length) {
+                fileNameDisplay.textContent = fileInput.files[0].name;
+                fileNameDisplay.classList.remove('hidden');
+                btnUpload.disabled = false;
+            }
+        }
+
+        // Upload Logic
+        btnUpload.addEventListener('click', async () => {
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.querySelector('p').textContent = "Carregando e processando salas... Isso pode levar alguns segundos.";
+
+            try {
+                const response = await fetch('/upload_master', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Populate rooms
+                    roomSelect.innerHTML = '<option value="" selected disabled>Selecione uma sala...</option>';
+                    result.rooms.forEach(room => {
+                        const option = document.createElement('option');
+                        option.value = room.id; // Sheet name is the ID
+                        option.textContent = room.name; // Display name extracted from "Denominação"
+                        roomSelect.appendChild(option);
+                    });
+                    
+                    // Enable next step
+                    stepVerify.classList.remove('disabled');
+                    roomSelect.disabled = false;
+                    
+                    // Scroll to next step
+                    stepVerify.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    alert('Erro: ' + result.error);
+                }
+            } catch (error) {
+                alert('Erro ao enviar arquivo: ' + error);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+                loadingOverlay.querySelector('p').textContent = "Processando..."; // Reset text
+            }
+        });
+
+        // Verify Logic
+        btnVerify.addEventListener('click', async () => {
+            const analystName = document.getElementById('analyst-name').value;
+            const roomName = roomSelect.value;
+            const scannedCodes = document.getElementById('scanned-codes').value;
+
+            if (!analystName || !roomName || !scannedCodes) {
+                alert('Por favor, preencha todos os campos.');
+                return;
+            }
+
+            loadingOverlay.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        analyst_name: analystName,
+                        room_name: roomName,
+                        scanned_codes: scannedCodes
+                    })
+                });
+
+                if (response.ok) {
+                    // Trigger download
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${analystName}_Relatorios.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    const result = await response.json();
+                    alert('Erro: ' + result.error);
+                }
+            } catch (error) {
+                alert('Erro ao processar: ' + error);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
