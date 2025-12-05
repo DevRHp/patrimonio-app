@@ -180,6 +180,13 @@
 
             <!-- ADMIN AREA -->
             <section id="admin-section" class="hidden">
+                 <div class="card" style="background: transparent; box-shadow: none; margin-bottom: 10px;">
+                    <button id="btn-admin-back" class="btn link-style" style="color: #666; width: auto; float: left;">
+                        <i class="fas fa-arrow-left"></i> Voltar (Sair)
+                    </button>
+                    <div style="clear:both;"></div>
+                </div>
+
                 <!-- Manage Masters -->
                 <section class="card">
                     <div class="card-header">
@@ -327,6 +334,15 @@
             location.reload();
         });
 
+        if(document.getElementById('btn-admin-back')) {
+            document.getElementById('btn-admin-back').addEventListener('click', async () => {
+                 await fetch('/logout', {method: 'POST'});
+                 // Instead of reload, maybe just go back to role screen? 
+                 // But security wise, logout is better.
+                 location.reload();
+            });
+        }
+
         // --- Admin: Masters ---
         async function loadAdminMasters() {
             const listFn = async () => {
@@ -338,7 +354,12 @@
                 data.masters.forEach(f => {
                     const div = document.createElement('div');
                     div.className = 'file-list-item';
-                    div.innerHTML = `<span><i class="fas fa-file-excel"></i> ${f}</span> <button class="btn danger" style="width:auto; padding:5px 10px;" onclick="deleteMaster('${f}')"><i class="fas fa-trash"></i></button>`;
+                    div.innerHTML = `
+                        <span><i class="fas fa-file-excel"></i> ${f}</span> 
+                        <div>
+                            <a href="/get_master/${f}" class="btn secondary" style="width:auto; padding:5px 10px; display:inline-block; margin-right:5px; font-size: 0.8rem;"><i class="fas fa-download"></i></a>
+                            <button class="btn danger" style="width:auto; padding:5px 10px;" onclick="deleteMaster('${f}')"><i class="fas fa-trash"></i></button>
+                        </div>`;
                     container.appendChild(div);
                 });
             };
