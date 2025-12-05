@@ -14,6 +14,8 @@ ARQUIVOS_PARA_UPLOAD/
 planilhas/
 test_results.zip
 *.xlsx
+*.zip
+tests/output.txt
 
 # Configurações de IDE
 .vscode/
