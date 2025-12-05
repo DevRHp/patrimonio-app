@@ -13,8 +13,9 @@ app.secret_key = 'super_secret_key_sesi_sorocaba' # Change this in production!
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-REPORTS_FOLDER = os.path.join(UPLOAD_FOLDER, 'reports')
-os.makedirs(REPORTS_FOLDER, exist_ok=True)
+
+SCANNED_DATA_FOLDER = os.path.join(UPLOAD_FOLDER, 'scanned_data')
+os.makedirs(SCANNED_DATA_FOLDER, exist_ok=True)
 
 # --- Routes ---
 
@@ -209,6 +210,30 @@ def get_report(filename):
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 
+@app.route('/download_all_data', methods=['GET'])
+def download_all_data():
+    if not session.get('is_admin'):
+        return jsonify({'error': 'Acesso negado.'}), 403
+    
+    try:
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            if os.path.exists(SCANNED_DATA_FOLDER):
+                for filename in os.listdir(SCANNED_DATA_FOLDER):
+                    file_path = os.path.join(SCANNED_DATA_FOLDER, filename)
+                    zf.write(file_path, arcname=filename)
+        
+        memory_file.seek(0)
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='Todos_Dados_Brutos.zip'
+        )
+    except Exception as e:
+         return jsonify({'error': str(e)}), 500
+
+
 # --- Core Logic: Verify ---
 
 @app.route('/verify', methods=['POST'])
@@ -233,6 +258,20 @@ def verify():
         return jsonify({'error': f'Arquivo fonte "{source_file}" não encontrado'}), 404
 
     try:
+        # --- 0. Save Raw Data ---
+        safe_room_name = "".join([c for c in selected_room if c.isalnum() or c in (' ','-','_')]).strip()
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        raw_filename = f"{analyst_name}_{safe_room_name}_{timestamp}.txt"
+        raw_path = os.path.join(SCANNED_DATA_FOLDER, raw_filename)
+        
+        with open(raw_path, 'w', encoding='utf-8') as f:
+            f.write(f"Analista: {analyst_name}\n")
+            f.write(f"Sala: {selected_room}\n")
+            f.write(f"Arquivo Fonte: {source_file}\n")
+            f.write(f"Data: {timestamp}\n")
+            f.write("-" * 20 + "\n")
+            f.write(scanned_codes_raw)
+        
         # Load the source workbook (Target Room)
         wb = load_workbook(source_path)
         
@@ -268,7 +307,7 @@ def verify():
                 for cell in row:
                     cell.fill = green_fill
 
-        # --- 3. Missing Items (Sheet 2: Nao Encontrados) ---
+        # --- 2. Missing Items (Sheet 2: Nao Encontrados) ---
         missing_ws = wb.create_sheet("Nao Encontrados")
         # Copy column dimensions
         for col_name, col_dim in source_ws.column_dimensions.items():
@@ -309,13 +348,28 @@ def verify():
                 current_row_idx += 1
 
 
-        # --- 2. Wrong Location Items (Sheet 3: Local Incorreto) ---
-        wrong_location_ws = wb.create_sheet("Local Incorreto")
-        wrong_location_ws.append(["Codigo", "Encontrado na Sala", "Deveria estar em", "Descricao do Item"]) 
-        # Style header
-        if source_ws.cell(1,1).has_style:
-             for cell in wrong_location_ws[1]:
-                cell.font = copy(source_ws.cell(1,1).font)
+        # --- 3. Wrong Location Items (Sheet 3: Local Incorreto) ---
+        # Strategy: Copy source sheet structure (to preserve headers/styles), clear data, populate with found items + Location col
+        wrong_location_ws = wb.copy_worksheet(source_ws)
+        wrong_location_ws.title = "Local Incorreto"
+        
+        # Clear all data rows (keep header at row 1)
+        # It's safer to delete rows from bottom up to avoid index shifting issues, but for clearing content we can just iterate.
+        # Actually, delete_rows is better to clear styles/values
+        max_row = wrong_location_ws.max_row
+        if max_row > 1:
+            wrong_location_ws.delete_rows(2, max_row - 1)
+            
+        # Add new header column for "Encontrado Em"
+        max_col = wrong_location_ws.max_column
+        new_header_cell = wrong_location_ws.cell(row=1, column=max_col + 1, value="Encontrado Em (Sala Real)")
+        # Copy style from previous header cell
+        ref_header = wrong_location_ws.cell(row=1, column=max_col)
+        if ref_header.has_style:
+            new_header_cell.font = copy(ref_header.font)
+            new_header_cell.border = copy(ref_header.border)
+            new_header_cell.fill = copy(ref_header.fill)
+            new_header_cell.alignment = copy(ref_header.alignment)
 
         scanned_but_not_in_room = scanned_codes - found_in_room_codes
         
@@ -323,8 +377,10 @@ def verify():
         files_to_search = selected_files if selected_files else [source_file]
         
         for code in scanned_but_not_in_room:
-            found_location = "Nao encontrado nas planilhas selecionadas"
-            item_description = "Desconhecido"
+            found_location = "Nao encontrado"
+            found_row_values = None
+            found_row_styles = None # We won't easily copy row styles from other files without complex logic, so we'll just write values
+            
             found_in_cross_ref = False
             
             for fname in files_to_search:
@@ -332,7 +388,7 @@ def verify():
                 if not os.path.exists(fpath): continue
                 
                 try:
-                    # Optimization: open read-only
+                    # We need data access. 
                     wb_search = load_workbook(fpath, read_only=True, data_only=True)
                     for sheet_name in wb_search.sheetnames:
                         if fname == source_file and sheet_name == selected_room: continue
@@ -341,10 +397,8 @@ def verify():
                         for row in sheet.iter_rows(values_only=True):
                             row_str_values = [str(v).strip() for v in row if v is not None]
                             if code in row_str_values:
-                                found_location = f"{sheet_name} ({fname})"
-                                # Heuristic for description: 2nd column
-                                if len(row) > 1:
-                                    item_description = str(row[1]) 
+                                found_location = f"{sheet_name}"
+                                found_row_values = list(row) # Capture the whole row data
                                 found_in_cross_ref = True
                                 break
                         if found_in_cross_ref: break
@@ -353,7 +407,22 @@ def verify():
                     continue
                 if found_in_cross_ref: break
             
-            wrong_location_ws.append([code, selected_room, found_location, item_description])
+            # Append to Wrong Location Sheet
+            if found_row_values:
+                # If we found the full row in another sheet, we try to align it best we can. 
+                # Ideally, if schemas match, we just paste it. 
+                # If schema is unknown, we just paste what we found + location.
+                row_data = found_row_values + [found_location]
+                wrong_location_ws.append(row_data)
+            else:
+                # If not found in any other sheet, just put the code and "Not Found"
+                # And try to put the code in the first column or where "Codigo" matches?
+                # Simpler: Just append a row with Code + Location. 
+                # But to respect the "Model", we should try to match columns. 
+                # For now, let's just append [Code, Location] is risky if column 1 isn't code.
+                # Fallback: Just append [Code, ... empties ..., Location]
+                wrong_location_ws.append([code, "Nao Encontrado nas planilhas"] + ([""] * (max_col - 2)) + [found_location])
+
 
         # --- Save and Zip ---
         memory_file = io.BytesIO()
