@@ -274,7 +274,7 @@ textarea {
 
 .landing-content {
     text-align: center;
-    max-width: 800px;
+    max-width: 1000px;
     padding: 40px;
     margin-bottom: 10vh; /* Move slightly above center */
     display: flex;
@@ -306,7 +306,7 @@ textarea {
 .developers {
     display: flex;
     flex-direction: row;
-    gap: 50px;
+    gap: 30px;
     color: var(--text-light);
     flex-wrap: wrap;
     justify-content: center;
