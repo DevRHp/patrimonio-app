@@ -88,18 +88,26 @@
         </div>
     </div>
 
-    <!-- Login Modal (Same as before) -->
-    <div id="login-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <span id="close-login-modal" class="close-modal">&times;</span>
-            <h2>Login Administrativo</h2>
-            <div class="form-group">
-                <input type="text" id="admin-email" placeholder="E-mail">
+    <!-- Screen 3: Admin Login -->
+    <div id="admin-login-screen" class="landing-page hidden">
+        <div class="landing-content">
+            <h1>Login Administrativo</h1>
+            <p class="subtitle">Informe suas credenciais</p>
+            
+            <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto;">
+                <label for="admin-email">E-mail</label>
+                <input type="text" id="admin-email" placeholder="admin@123">
             </div>
-            <div class="form-group">
-                <input type="password" id="admin-password" placeholder="Senha">
+            <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto 20px auto;">
+                <label for="admin-password">Senha</label>
+                <input type="password" id="admin-password" placeholder="admin123">
             </div>
-            <button id="btn-do-login" class="btn primary">Entrar</button>
+            
+            <button id="btn-do-login" class="btn primary large">Entrar</button>
+            
+            <button id="btn-back-role" class="btn link-style" style="margin-top:20px; color: #666;">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </button>
         </div>
     </div>
 
@@ -237,11 +245,12 @@
         // --- Navigation ---
         const introScreen = document.getElementById('intro-screen');
         const roleScreen = document.getElementById('role-selection-screen');
+        const loginScreen = document.getElementById('admin-login-screen');
         const appContainer = document.getElementById('app-container');
         
         // Intro -> Role
         document.getElementById('btn-start').addEventListener('click', () => {
-            introScreen.classList.add('hidden'); // Simple logic for now, or add transitions
+            introScreen.classList.add('hidden');
             roleScreen.classList.remove('hidden');
             roleScreen.classList.add('fade-in');
         });
@@ -253,19 +262,33 @@
              introScreen.classList.add('fade-in');
         });
         
-        // Role -> App or Modal
+        // Role -> Admin Login
+        document.getElementById('btn-admin-access').addEventListener('click', () => {
+            roleScreen.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+            loginScreen.classList.add('fade-in');
+        });
+
+        // Admin Login -> Role (Back)
+        document.getElementById('btn-back-role').addEventListener('click', () => {
+            loginScreen.classList.add('hidden');
+            roleScreen.classList.remove('hidden');
+            roleScreen.classList.add('fade-in');
+        });
+
+        // Role -> App (User)
         document.getElementById('btn-user-access').addEventListener('click', () => showApp(false));
-        document.getElementById('btn-admin-access').addEventListener('click', () => document.getElementById('login-modal').classList.remove('hidden'));
-        document.getElementById('close-login-modal').addEventListener('click', () => document.getElementById('login-modal').classList.add('hidden'));
+         
+        // Return Home
         document.getElementById('btn-back-home').addEventListener('click', () => location.reload());
 
         function showApp(isAdmin) {
-            roleScreen.classList.add('fade-out');
-            setTimeout(() => {
-                roleScreen.classList.add('hidden');
-                appContainer.classList.remove('hidden');
-                appContainer.classList.add('fade-in');
-            }, 500);
+             // Hide whatever screen was active
+            roleScreen.classList.add('hidden');
+            loginScreen.classList.add('hidden');
+            
+            appContainer.classList.remove('hidden');
+            appContainer.classList.add('fade-in');
 
             if (isAdmin) {
                 document.getElementById('admin-section').classList.remove('hidden');
@@ -281,6 +304,8 @@
             }
         }
 
+
+
         // --- Login ---
         document.getElementById('btn-do-login').addEventListener('click', async () => {
             const email = document.getElementById('admin-email').value;
@@ -292,7 +317,6 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    document.getElementById('login-modal').classList.add('hidden');
                     showApp(true);
                 } else alert(data.error);
             } catch (e) { alert(e); }
