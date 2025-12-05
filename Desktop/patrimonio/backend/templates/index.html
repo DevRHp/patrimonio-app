@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SESI Sorocaba - Auditoria Patrimonial</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landing-page" class="landing-page">
+        <div class="landing-content">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="FabLab Logo" class="landing-logo">
+            <h1>Sistema de Auditoria Patrimonial</h1>
+            <p class="subtitle">SESI Sorocaba</p>
+            
+            <button id="btn-user-access" class="btn primary large">
+                <i class="fas fa-user-check"></i> Área do Usuário
+            </button>
+            <button id="btn-admin-access" class="btn secondary large">
+                <i class="fas fa-lock"></i> Acesso Administrativo
+            </button>
+        </div>
+
+        <div class="landing-footer">
+            <div class="developers">
+                <div class="role-group">
+                    <p class="role">Desenvolvedor</p>
+                    <p class="name">Rafael Henrique Prudenci</p>
+                </div>
+                <!-- Other credits remain -->
+                <div class="role-group">
+                    <p class="role">Orientador</p>
+                    <p class="name">Marcelo Dias de Freitas Junior</p>
+                </div>
+                 <div class="role-group">
+                    <p class="role">Técnico de Teatro</p>
+                    <p class="name">Leonardo Oliveira de Camargo</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span id="close-login-modal" class="close-modal">&times;</span>
+            <h2>Login Administrativo</h2>
+            <div class="form-group">
+                <input type="text" id="admin-email" placeholder="E-mail">
+            </div>
+            <div class="form-group">
+                <input type="password" id="admin-password" placeholder="Senha">
+            </div>
+            <button id="btn-do-login" class="btn primary">Entrar</button>
+        </div>
+    </div>
+
+    <div id="app-container" class="container hidden">
+        <header>
+            <div class="logo-area">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="FabLab Logo" class="logo">
+                <h1>Sistema de Auditoria Patrimonial</h1>
+                <p>SESI Sorocaba</p>
+            </div>
+            <div id="header-actions" class="hidden">
+                 <button id="btn-logout" class="btn secondary" style="width: auto; padding: 5px 15px; font-size: 0.9rem;">Sair</button>
+            </div>
+        </header>
+
+        <main>
+            <!-- USER AREA: Verify -->
+            <section id="user-section" class="hidden">
+                <section id="step-verify" class="card">
+                     <div class="card-header">
+                        <div class="header-title">
+                            <div class="step-number"><i class="fas fa-clipboard-check"></i></div>
+                            <h2>Dados da Auditoria</h2>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                         <div id="master-status-msg" class="description hidden"></div>
+
+                        <div class="form-group">
+                            <label for="analyst-name">Nome do Analista</label>
+                            <input type="text" id="analyst-name" placeholder="Ex: João Silva">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="room-select">Sala em Análise</label>
+                            <select id="room-select" disabled>
+                                <option value="" selected disabled>Carregando salas...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="scanned-codes">Códigos Bipados</label>
+                            <textarea id="scanned-codes" placeholder="Cole aqui os códigos bipados (um por linha)..."></textarea>
+                        </div>
+
+                        <button id="btn-verify" class="btn success">
+                            <i class="fas fa-check-circle"></i> Verificar e Gerar Relatório
+                        </button>
+                         <button id="btn-back-home" class="btn secondary">Voltar</button>
+                    </div>
+                </section>
+            </section>
+
+            <!-- ADMIN AREA -->
+            <section id="admin-section" class="hidden">
+                <!-- Upload Master -->
+                <section id="step-upload" class="card">
+                    <div class="card-header">
+                        <div class="header-title">
+                             <div class="step-number">1</div>
+                             <h2>Gerenciar Planilha Mãe</h2>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="current-master-status">
+                             <p class="description">Status: <span id="master-file-status">Verificando...</span></p>
+                             <button id="btn-delete-master" class="btn danger hidden"><i class="fas fa-trash"></i> Remover Planilha Atual</button>
+                        </div>
+                        
+                        <div id="upload-container">
+                            <p class="description" style="margin-top: 20px;">Carregar nova planilha:</p>
+                            <div class="upload-area" id="drop-zone">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Arraste o arquivo aqui ou clique para selecionar</p>
+                                <input type="file" id="file-input" accept=".xlsx" hidden>
+                            </div>
+                            <div id="file-name" class="file-name hidden"></div>
+
+                            <button id="btn-upload" class="btn primary" disabled>
+                                <i class="fas fa-upload"></i> Enviar Planilha
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Reports List -->
+                 <section class="card">
+                     <div class="card-header">
+                        <div class="header-title">
+                             <div class="step-number">2</div>
+                             <h2>Relatórios Gerados</h2>
+                        </div>
+                        <button id="btn-refresh-reports" class="btn secondary" style="width: auto; padding: 5px 10px;"><i class="fas fa-sync"></i></button>
+                    </div>
+                    <div class="card-body">
+                         <ul id="reports-list" class="reports-list">
+                             <li class="report-item">Carregando...</li>
+                         </ul>
+                    </div>
+                </section>
+            </section>
+            
+        </main>
+
+        <footer>
+            <p>&copy; 2025 SESI Sorocaba - Todos os direitos reservados.</p>
+        </footer>
+    </div>
+
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p>Processando...</p>
+    </div>
+
+    <script>
+        // DOM Elements
+        const landingPage = document.getElementById('landing-page');
+        const appContainer = document.getElementById('app-container');
+        const loginModal = document.getElementById('login-modal');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        // Buttons
+        const btnUserAccess = document.getElementById('btn-user-access');
+        const btnAdminAccess = document.getElementById('btn-admin-access');
+        const btnDoLogin = document.getElementById('btn-do-login');
+        const btnLogout = document.getElementById('btn-logout');
+        const closeLoginModal = document.getElementById('close-login-modal');
+        const btnBackHome = document.getElementById('btn-back-home');
+
+        // Sections
+        const userSection = document.getElementById('user-section');
+        const adminSection = document.getElementById('admin-section');
+        
+        // Admin Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileNameDisplay = document.getElementById('file-name');
+        const btnUpload = document.getElementById('btn-upload');
+        const masterFileStatus = document.getElementById('master-file-status');
+        const btnDeleteMaster = document.getElementById('btn-delete-master');
+        const reportsList = document.getElementById('reports-list');
+        const btnRefreshReports = document.getElementById('btn-refresh-reports');
+
+        // User Elements
+        const roomSelect = document.getElementById('room-select');
+        const btnVerify = document.getElementById('btn-verify');
+        const masterStatusMsg = document.getElementById('master-status-msg');
+
+        // --- Navigation Logic ---
+
+        btnUserAccess.addEventListener('click', () => {
+             showApp(false);
+        });
+
+        btnAdminAccess.addEventListener('click', () => {
+            loginModal.classList.remove('hidden');
+        });
+
+        closeLoginModal.addEventListener('click', () => {
+            loginModal.classList.add('hidden');
+        });
+
+        btnBackHome.addEventListener('click', () => {
+            location.reload();
+        });
+
+        function showApp(isAdmin) {
+            landingPage.classList.add('fade-out');
+            setTimeout(() => {
+                landingPage.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                appContainer.classList.add('fade-in');
+            }, 500);
+
+            if (isAdmin) {
+                adminSection.classList.remove('hidden');
+                userSection.classList.add('hidden');
+                document.getElementById('header-actions').classList.remove('hidden');
+                checkMasterStatus();
+                loadReports();
+            } else {
+                userSection.classList.remove('hidden');
+                adminSection.classList.add('hidden');
+                document.getElementById('header-actions').classList.add('hidden');
+                initUserArea();
+            }
+        }
+
+        // --- Login/Logout Logic ---
+
+        btnDoLogin.addEventListener('click', async () => {
+            const email = document.getElementById('admin-email').value;
+            const password = document.getElementById('admin-password').value;
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email, password})
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    loginModal.classList.add('hidden');
+                    showApp(true);
+                } else {
+                    alert(result.error);
+                }
+            } catch (e) {
+                alert('Erro de conexão: ' + e);
+            }
+        });
+
+        btnLogout.addEventListener('click', async () => {
+            await fetch('/logout', {method: 'POST'});
+            location.reload();
+        });
+
+        // --- Admin: Master Spreadsheet Logic ---
+
+        async function checkMasterStatus() {
+            try {
+                const response = await fetch('/check_master');
+                const data = await response.json();
+                if (data.exists) {
+                    masterFileStatus.textContent = `Presente: ${data.filename}`;
+                    masterFileStatus.classList.add('highlight');
+                    btnDeleteMaster.classList.remove('hidden');
+                } else {
+                    masterFileStatus.textContent = "Nenhuma planilha carregada.";
+                    masterFileStatus.classList.remove('highlight');
+                    btnDeleteMaster.classList.add('hidden');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        btnDeleteMaster.addEventListener('click', async () => {
+            if(!confirm('Tem certeza que deseja remover a planilha mãe? Os usuários não poderão mais realizar verificações.')) return;
+            
+            try {
+                const response = await fetch('/delete_master', {method: 'POST'});
+                const result = await response.json();
+                if (response.ok) {
+                    alert(result.message);
+                    checkMasterStatus();
+                } else {
+                    alert(result.error);
+                }
+            } catch (e) {
+                alert('Erro: ' + e);
+            }
+        });
+
+        // --- Admin: Upload Logic (Same as before but specific to admin) ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; updateFileName(); }
+        });
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length) {
+                fileNameDisplay.textContent = fileInput.files[0].name;
+                fileNameDisplay.classList.remove('hidden');
+                btnUpload.disabled = false;
+            }
+        }
+
+        btnUpload.addEventListener('click', async () => {
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            loadingOverlay.classList.remove('hidden');
+            try {
+                const response = await fetch('/upload_master', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Upload realizado com sucesso!');
+                    checkMasterStatus();
+                    fileInput.value = '';
+                    fileNameDisplay.classList.add('hidden');
+                    btnUpload.disabled = true;
+                } else {
+                    alert('Erro: ' + result.error);
+                }
+            } catch (e) {
+                alert('Erro ao enviar: ' + e);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        });
+
+        // --- Admin: Reports Logic ---
+        async function loadReports() {
+            reportsList.innerHTML = '<li class="report-item">Carregando...</li>';
+            try {
+                const response = await fetch('/list_reports');
+                const data = await response.json();
+                reportsList.innerHTML = '';
+                if (data.reports && data.reports.length > 0) {
+                    data.reports.forEach(report => {
+                         const li = document.createElement('li');
+                         li.className = 'report-item';
+                         li.innerHTML = `
+                            <span>${report.filename}</span>
+                            <a href="/get_report/${report.filename}" class="report-link" download>Baixar</a>
+                         `;
+                         reportsList.appendChild(li);
+                    });
+                } else {
+                    reportsList.innerHTML = '<li class="report-item">Nenhum relatório encontrado.</li>';
+                }
+            } catch (e) {
+                reportsList.innerHTML = '<li class="report-item">Erro ao carregar relatórios.</li>';
+            }
+        }
+        
+        btnRefreshReports.addEventListener('click', loadReports);
+
+        // --- User: Audit Logic ---
+        
+        async function initUserArea() {
+            // Need to reload room options (using the same /upload_master endpoint response logic might be tricky without re-uploading)
+            // Ideally we need a separate endpoint to get rooms. 
+            // BUT, looking at app.py, rooms are returned only on upload. 
+            // We need to fetch rooms separately.
+            // Let's implement a quick fetch for rooms by re-uploading? NO.
+            // We need to read the master file on server.
+            // Let's modify the frontend to try and verify immediately? 
+            // Wait, room-select needs options.
+            // I should have added a /get_rooms endpoint in app.py.
+            // Let's see if I can do it without modifying app.py again?
+            // "Faça o upload da planilha contendo todos os ativos e salas." -> Original logic.
+            // Now the master sheet is already there.
+            // I MUST ADD /get_rooms to app.py to Populate the select. 
+            
+            // Wait, I missed this in the plan. 
+            // I'll add a quick tool call to add /get_rooms to app.py.
+            
+            // For now, I'll put a placeholder in the UI code for fetch('/get_rooms').
+            
+            try {
+                const response = await fetch('/get_rooms'); // I will add this endpoint next
+                const data = await response.json();
+                
+                if (response.ok && data.rooms) {
+                    roomSelect.innerHTML = '<option value="" selected disabled>Selecione uma sala...</option>';
+                    data.rooms.forEach(room => {
+                        const option = document.createElement('option');
+                        option.value = room.id; 
+                        option.textContent = room.name;
+                        roomSelect.appendChild(option);
+                    });
+                    roomSelect.disabled = false;
+                    masterStatusMsg.classList.add('hidden');
+                } else {
+                     masterStatusMsg.textContent = "Aguardando planilha do administrador...";
+                     masterStatusMsg.classList.remove('hidden');
+                     roomSelect.innerHTML = '<option value="" selected disabled>Planilha indisponível</option>';
+                }
+            } catch(e) {
+                 masterStatusMsg.textContent = "Erro ao carregar salas.";
+                 masterStatusMsg.classList.remove('hidden');
+            }
+        }
+
+        btnVerify.addEventListener('click', async () => {
+            const analystName = document.getElementById('analyst-name').value;
+            const roomName = roomSelect.value;
+            const scannedCodes = document.getElementById('scanned-codes').value;
+
+            if (!analystName || !roomName || !scannedCodes) {
+                alert('Por favor, preencha todos os campos.');
+                return;
+            }
+
+            loadingOverlay.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ analyst_name: analystName, room_name: roomName, scanned_codes: scannedCodes })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${analystName}_Relatorios.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    const result = await response.json();
+                    alert('Erro: ' + result.error);
+                }
+            } catch (error) {
+                alert('Erro ao processar: ' + error);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        });
+
+    </script>
+</body>
+</html>

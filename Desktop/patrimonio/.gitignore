@@ -1,0 +1,20 @@
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# Dados e Arquivos Temporários
+uploads/*
+!uploads/.gitkeep
+Relatorios_Gerados/
+ARQUIVOS_PARA_UPLOAD/
+planilhas/
+test_results.zip
+*.xlsx
+
+# Configurações de IDE
+.vscode/
+.idea/
