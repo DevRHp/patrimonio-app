@@ -39,23 +39,14 @@
     </style>
 </head>
 <body>
-    <!-- Landing Page -->
-    <div id="landing-page" class="landing-page">
+    <!-- Screen 1: Intro / Splash -->
+    <div id="intro-screen" class="landing-page show">
         <div class="landing-content">
             <img src="{{ url_for('static', filename='logo.png') }}" alt="FabLab Logo" class="landing-logo">
             <h1>Sistema de Auditoria Patrimonial</h1>
             <p class="subtitle">SESI Sorocaba</p>
             
-            <button id="btn-user-access" class="btn primary large">
-                <i class="fas fa-user-check"></i> Área do Usuário
-            </button>
-            <button id="btn-admin-access" class="btn secondary large">
-                <i class="fas fa-lock"></i> Acesso Administrativo
-            </button>
-        </div>
-        <!-- Credits footer -->
-         <div class="landing-footer">
-            <div class="developers">
+            <div class="developers" style="margin: 30px 0;">
                 <div class="role-group">
                     <p class="role">Desenvolvedor</p>
                     <p class="name">Rafael Henrique Prudenci</p>
@@ -69,10 +60,35 @@
                     <p class="name">Leonardo Oliveira de Camargo</p>
                 </div>
             </div>
+
+            <button id="btn-start" class="btn primary large pulse-animation">
+                Iniciar Sistema <i class="fas fa-arrow-right"></i>
+            </button>
         </div>
     </div>
 
-    <!-- Login Modal -->
+    <!-- Screen 2: Role Selection -->
+    <div id="role-selection-screen" class="landing-page hidden bg-variant">
+        <div class="landing-content">
+            <h1>Escolha o Tipo de Acesso</h1>
+            <p class="subtitle">Como deseja entrar no sistema?</p>
+            
+            <div class="action-buttons-vertical">
+                <button id="btn-user-access" class="btn primary large">
+                    <i class="fas fa-user-check"></i> Área do Usuário
+                </button>
+                <button id="btn-admin-access" class="btn secondary large">
+                    <i class="fas fa-lock"></i> Acesso Administrativo
+                </button>
+            </div>
+            
+             <button id="btn-back-intro" class="btn link-style" style="margin-top:20px; color: #666;">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </button>
+        </div>
+    </div>
+
+    <!-- Login Modal (Same as before) -->
     <div id="login-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <span id="close-login-modal" class="close-modal">&times;</span>
@@ -219,18 +235,34 @@
         };
 
         // --- Navigation ---
-        const landingPage = document.getElementById('landing-page');
+        const introScreen = document.getElementById('intro-screen');
+        const roleScreen = document.getElementById('role-selection-screen');
         const appContainer = document.getElementById('app-container');
         
+        // Intro -> Role
+        document.getElementById('btn-start').addEventListener('click', () => {
+            introScreen.classList.add('hidden'); // Simple logic for now, or add transitions
+            roleScreen.classList.remove('hidden');
+            roleScreen.classList.add('fade-in');
+        });
+
+        // Role -> Intro (Back)
+        document.getElementById('btn-back-intro').addEventListener('click', () => {
+             roleScreen.classList.add('hidden');
+             introScreen.classList.remove('hidden');
+             introScreen.classList.add('fade-in');
+        });
+        
+        // Role -> App or Modal
         document.getElementById('btn-user-access').addEventListener('click', () => showApp(false));
         document.getElementById('btn-admin-access').addEventListener('click', () => document.getElementById('login-modal').classList.remove('hidden'));
         document.getElementById('close-login-modal').addEventListener('click', () => document.getElementById('login-modal').classList.add('hidden'));
         document.getElementById('btn-back-home').addEventListener('click', () => location.reload());
 
         function showApp(isAdmin) {
-            landingPage.classList.add('fade-out');
+            roleScreen.classList.add('fade-out');
             setTimeout(() => {
-                landingPage.classList.add('hidden');
+                roleScreen.classList.add('hidden');
                 appContainer.classList.remove('hidden');
                 appContainer.classList.add('fade-in');
             }, 500);
