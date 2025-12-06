@@ -6,18 +6,28 @@ from flask import Flask, render_template, request, send_file, jsonify, session
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 from copy import copy
+import unicodedata
+import re
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_sesi_sorocaba' # Change this in production!
 
-UPLOAD_FOLDER = 'uploads'
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Check if running from root (via Procfile) or from backend folder
+# Logic: If 'backend' is in path, we might be inside. But safest is to go one level up if 'backend' is the dirname.
+# Actually, standard practice: static relative to app.py location
+# UPLOADS should be in project root usually.
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, '..'))
+
+UPLOAD_FOLDER = os.path.join(PROJECT_ROOT, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 SCANNED_DATA_FOLDER = os.path.join(UPLOAD_FOLDER, 'scanned_data')
 os.makedirs(SCANNED_DATA_FOLDER, exist_ok=True)
 
-REPORTS_FOLDER = 'Relatorios_Gerados'
+REPORTS_FOLDER = os.path.join(PROJECT_ROOT, 'Relatorios_Gerados')
 os.makedirs(REPORTS_FOLDER, exist_ok=True)
 
 # --- Routes ---
@@ -261,10 +271,17 @@ def verify():
         return jsonify({'error': f'Arquivo fonte "{source_file}" não encontrado'}), 404
 
     try:
-        # --- 0. Save Raw Data ---
-        safe_room_name = "".join([c for c in selected_room if c.isalnum() or c in (' ','-','_')]).strip()
+        # Sanitize filename (ASCII only)
+        def slugify(value):
+            value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+            value = re.sub(r'[^\w\s-]', '', value).strip().lower()
+            return re.sub(r'[-\s]+', '_', value)
+
+        safe_room = slugify(selected_room)
+        safe_analyst = slugify(analyst_name)
+
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        raw_filename = f"{analyst_name}_{safe_room_name}_{timestamp}.txt"
+        raw_filename = f"{safe_analyst}_{safe_room}_{timestamp}.txt"
         raw_path = os.path.join(SCANNED_DATA_FOLDER, raw_filename)
         
         with open(raw_path, 'w', encoding='utf-8') as f:
@@ -489,8 +506,7 @@ def verify():
         memory_file.seek(0)
         
         # Save unique report by overwriting based on Analyst + Room
-        safe_room = "".join([c for c in selected_room if c.isalnum() or c in (' ','-','_')]).strip()
-        report_filename = f"{analyst_name}_{safe_room}_Analise.zip"
+        report_filename = f"{safe_analyst}_{safe_room}_Analise.zip"
         report_path = os.path.join(REPORTS_FOLDER, report_filename)
         
         with open(report_path, 'wb') as f:
@@ -500,6 +516,12 @@ def verify():
         drive_link = None
         try:
             import drive_manager
+            # Use original names for Google Drive folder display if desired, or safe names.
+            # Using original names for folder, but safe for file logic.
+            # drive_manager.upload_audit_results expects specific keys? 
+            # It uses temp_files_map keys (filenames). The filenames inside zip are "analyst_name...". 
+            # Let's keep internal zip/drive filenames as raw (with spaces) if that was working, or switch to safe?
+            # Changing to safe names everywhere is cleaner. 
             drive_link = drive_manager.upload_audit_results(analyst_name, selected_room, temp_files_map)
         except Exception as e:
             print(f"Drive Upload Error: {e}")

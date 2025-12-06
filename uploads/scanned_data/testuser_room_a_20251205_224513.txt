@@ -1,0 +1,9 @@
+Analista: TestUser
+Sala: Room A
+Arquivo Fonte: dummy_master.xlsx
+Data: 20251205_224513
+--------------------
+
+A001
+B001
+C001
