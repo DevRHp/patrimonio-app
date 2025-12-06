@@ -17,6 +17,9 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 SCANNED_DATA_FOLDER = os.path.join(UPLOAD_FOLDER, 'scanned_data')
 os.makedirs(SCANNED_DATA_FOLDER, exist_ok=True)
 
+REPORTS_FOLDER = 'Relatorios_Gerados'
+os.makedirs(REPORTS_FOLDER, exist_ok=True)
+
 # --- Routes ---
 
 @app.route('/')
@@ -373,60 +376,70 @@ def verify():
 
         scanned_but_not_in_room = scanned_codes - found_in_room_codes
         
-        # Cross-referencing Logic
+        # Cross-referencing Logic Optimized
         files_to_search = selected_files if selected_files else [source_file]
         
-        for code in scanned_but_not_in_room:
-            found_location = "Nao encontrado"
-            found_row_values = None
-            found_row_styles = None # We won't easily copy row styles from other files without complex logic, so we'll just write values
-            
-            found_in_cross_ref = False
-            
+        # Map: code -> { location: str, row_values: list }
+        found_map = {} 
+        
+        # We only need to search for codes that are truly missing from the current room
+        codes_to_find = scanned_but_not_in_room
+        
+        if codes_to_find:
             for fname in files_to_search:
                 fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                 if not os.path.exists(fpath): continue
-                
+
                 try:
-                    # We need data access. 
                     wb_search = load_workbook(fpath, read_only=True, data_only=True)
                     for sheet_name in wb_search.sheetnames:
-                        if fname == source_file and sheet_name == selected_room: continue
+                        # Skip if it's the target room we already checked (unless it's a different file with same sheet name?? unlikely but safer to check file too)
+                        if fname == source_file and sheet_name == selected_room:
+                            continue
                         
                         sheet = wb_search[sheet_name]
                         for row in sheet.iter_rows(values_only=True):
+                            # Efficiently check this row against our set of needed codes
                             row_str_values = [str(v).strip() for v in row if v is not None]
-                            if code in row_str_values:
-                                found_location = f"{sheet_name}"
-                                found_row_values = list(row) # Capture the whole row data
-                                found_in_cross_ref = True
+                            
+                            # Find intersection
+                            intersection = set(row_str_values).intersection(codes_to_find)
+                            
+                            for code in intersection:
+                                if code not in found_map:
+                                    found_map[code] = {
+                                        'location': sheet_name,
+                                        'row_values': list(row)
+                                    }
+                            
+                            # Optimization: if we found all codes, break early
+                            if len(found_map) == len(codes_to_find):
                                 break
-                        if found_in_cross_ref: break
+                        if len(found_map) == len(codes_to_find): break
                     wb_search.close()
-                except:
+                    if len(found_map) == len(codes_to_find): break
+                except Exception as e:
+                    print(f"Error searching in {fname}: {e}")
                     continue
-                if found_in_cross_ref: break
-            
-            # Append to Wrong Location Sheet
-            if found_row_values:
-                # If we found the full row in another sheet, we try to align it best we can. 
-                # Ideally, if schemas match, we just paste it. 
-                # If schema is unknown, we just paste what we found + location.
-                row_data = found_row_values + [found_location]
+
+        # Append to Wrong Location Sheet
+        # Iterate original set to preserve order if possible, or just iterate found_map
+        for code in codes_to_find:
+            if code in found_map:
+                data = found_map[code]
+                row_data = data['row_values'] + [data['location']]
                 wrong_location_ws.append(row_data)
             else:
-                # If not found in any other sheet, just put the code and "Not Found"
-                # And try to put the code in the first column or where "Codigo" matches?
-                # Simpler: Just append a row with Code + Location. 
-                # But to respect the "Model", we should try to match columns. 
-                # For now, let's just append [Code, Location] is risky if column 1 isn't code.
-                # Fallback: Just append [Code, ... empties ..., Location]
-                wrong_location_ws.append([code, "Nao Encontrado nas planilhas"] + ([""] * (max_col - 2)) + [found_location])
+                # Not found anywhere
+                wrong_location_ws.append([code, "Nao Encontrado nas planilhas"] + ([""] * (max_col - 2)) + ["Nao encontrado"])
 
 
         # --- Save and Zip ---
         memory_file = io.BytesIO()
         with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            
+            # Paths to temp files for Drive Upload
+            temp_files_map = {}
             
             temp_buffer = io.BytesIO()
             wb.save(temp_buffer)
@@ -436,27 +449,42 @@ def verify():
             wb_v = load_workbook(temp_buffer)
             for s in wb_v.sheetnames:
                 if s != "Verificados": del wb_v[s]
-            with io.BytesIO() as f_out:
-                wb_v.save(f_out)
-                zf.writestr(f"{analyst_name}_Verificados.xlsx", f_out.getvalue())
+            
+            f_v_name = f"{analyst_name}_Verificados.xlsx"
+            f_v_path = os.path.join(app.config['UPLOAD_FOLDER'], f_v_name)
+            wb_v.save(f_v_path)
+            temp_files_map[f_v_name] = f_v_path
+            
+            with open(f_v_path, 'rb') as f:
+                zf.writestr(f_v_name, f.read())
             
             # File 2: Missing
             temp_buffer.seek(0)
             wb_m = load_workbook(temp_buffer)
             for s in wb_m.sheetnames:
                 if s != "Nao Encontrados": del wb_m[s]
-            with io.BytesIO() as f_out:
-                wb_m.save(f_out)
-                zf.writestr(f"{analyst_name}_Nao_Encontrados.xlsx", f_out.getvalue())
+                
+            f_m_name = f"{analyst_name}_Nao_Encontrados.xlsx"
+            f_m_path = os.path.join(app.config['UPLOAD_FOLDER'], f_m_name)
+            wb_m.save(f_m_path)
+            temp_files_map[f_m_name] = f_m_path
+            
+            with open(f_m_path, 'rb') as f:
+                zf.writestr(f_m_name, f.read())
 
             # File 3: Wrong Location
             temp_buffer.seek(0)
             wb_w = load_workbook(temp_buffer)
             for s in wb_w.sheetnames:
                 if s != "Local Incorreto": del wb_w[s]
-            with io.BytesIO() as f_out:
-                wb_w.save(f_out)
-                zf.writestr(f"{analyst_name}_Local_Incorreto.xlsx", f_out.getvalue())
+                
+            f_w_name = f"{analyst_name}_Local_Incorreto.xlsx"
+            f_w_path = os.path.join(app.config['UPLOAD_FOLDER'], f_w_name)
+            wb_w.save(f_w_path)
+            temp_files_map[f_w_name] = f_w_path
+            
+            with open(f_w_path, 'rb') as f:
+                zf.writestr(f_w_name, f.read())
 
         memory_file.seek(0)
         
@@ -468,14 +496,24 @@ def verify():
         with open(report_path, 'wb') as f:
             f.write(memory_file.getvalue())
 
-        memory_file.seek(0)
+        # --- GOOGLE DRIVE UPLOAD ---
+        drive_link = None
+        try:
+            import drive_manager
+            drive_link = drive_manager.upload_audit_results(analyst_name, selected_room, temp_files_map)
+        except Exception as e:
+            print(f"Drive Upload Error: {e}")
         
-        return send_file(
-            memory_file,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=f'{analyst_name}_{safe_room}_Resultados.zip'
-        )
+        # Clean up temp files
+        for p in temp_files_map.values():
+            if os.path.exists(p): os.remove(p)
+
+        # Return JSON with download URL and Drive Link
+        return jsonify({
+            'success': True,
+            'download_url': f'/get_report/{report_filename}',
+            'drive_link': drive_link
+        })
 
     except Exception as e:
         import traceback

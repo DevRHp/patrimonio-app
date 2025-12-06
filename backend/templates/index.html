@@ -532,14 +532,27 @@
                  });
                  
                  if(res.ok) {
-                     const blob = await res.blob();
-                     const url = window.URL.createObjectURL(blob);
-                     const a = document.createElement('a');
-                     a.href = url;
-                     a.download = `${analyst}_Resultados.zip`;
-                     document.body.appendChild(a);
-                     a.click();
-                     a.remove();
+                     const data = await res.json();
+                     if(data.success) {
+                         alert('Auditoria concluída com sucesso!');
+                         
+                         // Open Drive Link
+                         if(data.drive_link) {
+                             window.open(data.drive_link, '_blank');
+                         }
+                         
+                         // Download ZIP as backup
+                         if(data.download_url) {
+                             const a = document.createElement('a');
+                             a.href = data.download_url;
+                             a.download = `${analyst}_Resultados.zip`; 
+                             document.body.appendChild(a);
+                             a.click();
+                             a.remove();
+                         }
+                     } else {
+                         alert('Erro: ' + data.error);
+                     }
                  } else {
                      const err = await res.json();
                      alert('Erro: ' + err.error);
