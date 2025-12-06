@@ -328,63 +328,46 @@ def verify():
                     cell.fill = green_fill
 
         # --- 2. Missing Items (Sheet 2: Nao Encontrados) ---
-        missing_ws = wb.create_sheet("Nao Encontrados")
-        # Copy column dimensions
-        for col_name, col_dim in source_ws.column_dimensions.items():
-            missing_ws.column_dimensions[col_name].width = col_dim.width
-
-        # Copy Header
-        for row in source_ws.iter_rows(min_row=1, max_row=1):
-            missing_ws.append([cell.value for cell in row])
-            for i, cell in enumerate(row):
-                new_cell = missing_ws.cell(row=1, column=i+1)
-                if cell.has_style:
-                    new_cell.font = copy(cell.font)
-                    new_cell.border = copy(cell.border)
-                    new_cell.fill = copy(cell.fill)
-                    new_cell.number_format = copy(cell.number_format)
-                    new_cell.protection = copy(cell.protection)
-                    new_cell.alignment = copy(cell.alignment)
-
-        # Copy Missing Rows
-        current_row_idx = 2
-        for row in source_ws.iter_rows(min_row=2):
+        # Strategy: Clone source sheet, delete rows that WERE found.
+        missing_ws = wb.copy_worksheet(source_ws)
+        missing_ws.title = "Nao Encontrados"
+        
+        # We need to identify which rows in the source were found, so we can delete them.
+        # We iterate in reverse order to avoid index shifting problems when deleting.
+        rows_to_delete = []
+        # source_ws.iter_rows gives us cells. We need 1-based index.
+        # Enumerate starts at 0, so row_idx = i + min_row (2)
+        for i, row in enumerate(missing_ws.iter_rows(min_row=2, values_only=True)):
+            row_idx = i + 2
             is_found = False
-            for cell in row:
-                if cell.value is not None and str(cell.value).strip() in found_in_room_codes:
+            for val in row:
+                if val is not None and str(val).strip() in scanned_codes:
                     is_found = True
                     break
             
-            if not is_found:
-                for i, cell in enumerate(row):
-                    new_cell = missing_ws.cell(row=current_row_idx, column=i+1, value=cell.value)
-                    if cell.has_style:
-                        new_cell.font = copy(cell.font)
-                        new_cell.border = copy(cell.border)
-                        new_cell.fill = copy(cell.fill)
-                        new_cell.number_format = copy(cell.number_format)
-                        new_cell.protection = copy(cell.protection)
-                        new_cell.alignment = copy(cell.alignment)
-                current_row_idx += 1
+            if is_found:
+                rows_to_delete.append(row_idx)
+        
+        # Delete rows in reverse order
+        for row_idx in reversed(rows_to_delete):
+            missing_ws.delete_rows(row_idx, 1)
 
 
         # --- 3. Wrong Location Items (Sheet 3: Local Incorreto) ---
-        # Strategy: Copy source sheet structure (to preserve headers/styles), clear data, populate with found items + Location col
+        # Strategy: Clone source sheet (to preserve headers/styles), clear data, populate with found items + Location col
         wrong_location_ws = wb.copy_worksheet(source_ws)
         wrong_location_ws.title = "Local Incorreto"
         
         # Clear all data rows (keep header at row 1)
-        # It's safer to delete rows from bottom up to avoid index shifting issues, but for clearing content we can just iterate.
-        # Actually, delete_rows is better to clear styles/values
-        max_row = wrong_location_ws.max_row
-        if max_row > 1:
-            wrong_location_ws.delete_rows(2, max_row - 1)
+        max_r = wrong_location_ws.max_row
+        if max_r > 1:
+            wrong_location_ws.delete_rows(2, max_r - 1)
             
         # Add new header column for "Encontrado Em"
-        max_col = wrong_location_ws.max_column
-        new_header_cell = wrong_location_ws.cell(row=1, column=max_col + 1, value="Encontrado Em (Sala Real)")
+        max_c = wrong_location_ws.max_column
+        new_header_cell = wrong_location_ws.cell(row=1, column=max_c + 1, value="Encontrado Em (Sala Real)")
         # Copy style from previous header cell
-        ref_header = wrong_location_ws.cell(row=1, column=max_col)
+        ref_header = wrong_location_ws.cell(row=1, column=max_c)
         if ref_header.has_style:
             new_header_cell.font = copy(ref_header.font)
             new_header_cell.border = copy(ref_header.border)
@@ -410,7 +393,7 @@ def verify():
                 try:
                     wb_search = load_workbook(fpath, read_only=True, data_only=True)
                     for sheet_name in wb_search.sheetnames:
-                        # Skip if it's the target room we already checked (unless it's a different file with same sheet name?? unlikely but safer to check file too)
+                        # Skip if it's the target room we already checked
                         if fname == source_file and sheet_name == selected_room:
                             continue
                         
@@ -448,7 +431,7 @@ def verify():
                 wrong_location_ws.append(row_data)
             else:
                 # Not found anywhere
-                wrong_location_ws.append([code, "Nao Encontrado nas planilhas"] + ([""] * (max_col - 2)) + ["Nao encontrado"])
+                wrong_location_ws.append([code, "Nao Encontrado nas planilhas"] + ([""] * (max_c - 2)) + ["Nao encontrado"])
 
 
         # --- Save and Zip ---
