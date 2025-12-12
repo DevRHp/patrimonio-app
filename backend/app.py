@@ -31,34 +31,58 @@ def close_connection(exception):
 def init_db():
     with app.app_context():
         db = get_db()
-        # Users Table
+        # Users Table - Updated for Networks
         db.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 city TEXT NOT NULL,
-                is_admin INTEGER DEFAULT 0
+                is_admin INTEGER DEFAULT 0,
+                network_name TEXT,
+                network_password TEXT
             )
         ''')
+        
+        # Migration: Add columns if they don't exist (for existing DBs)
+        try:
+            db.execute('ALTER TABLE users ADD COLUMN network_name TEXT')
+            print("Migrated users table: Added network_name")
+        except sqlite3.OperationalError:
+            pass # Column exists
+            
+        try:
+            db.execute('ALTER TABLE users ADD COLUMN network_password TEXT')
+            print("Migrated users table: Added network_password")
+        except sqlite3.OperationalError:
+            pass # Column exists
+
         # Files Table (Metadata for uploads)
         db.execute('''
             CREATE TABLE IF NOT EXISTS files (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 filename TEXT NOT NULL,
                 city TEXT NOT NULL,
-                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                FOREIGN KEY(user_id) REFERENCES users(id)
             )
         ''')
         
-        # Create Default Admin if not exists
-        # Default City: Sorocaba (as per context)
-        # Check if any admin exists
+        # Migration for files (user_id)
+        try:
+             db.execute('ALTER TABLE files ADD COLUMN user_id INTEGER REFERENCES users(id)')
+             print("Migrated files table: Added user_id")
+        except sqlite3.OperationalError:
+             pass
+
+        # Create Default Admin if not exists (Super Admin)
         cur = db.execute('SELECT * FROM users WHERE email = ?', ('admin@123',))
         if not cur.fetchone():
             default_pass = generate_password_hash('admin123')
-            db.execute('INSERT INTO users (email, password, city, is_admin) VALUES (?, ?, ?, ?)',
-                       ('admin@123', default_pass, 'Sorocaba', 1))
+            # Super admin has no specific network by default, or "Global"
+            db.execute('INSERT INTO users (email, password, city, is_admin, network_name) VALUES (?, ?, ?, ?, ?)',
+                       ('admin@123', default_pass, 'Sorocaba', 1, 'Admin Master'))
             db.commit()
             print("Default admin created: admin@123 / admin123 (City: Sorocaba)")
 
@@ -109,15 +133,22 @@ def login():
     db = get_db()
     user = db.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
 
+    # Admin Login (Super Admin or Network Admin)
     if user and check_password_hash(user['password'], password):
+        if not user['is_admin']:
+             return jsonify({'error': 'Acesso negado. Apenas administradores.'}), 403
+             
         session['user_id'] = user['id']
-        session['is_admin'] = bool(user['is_admin'])
+        session['is_admin'] = True
         session['city'] = user['city']
+        session['network_name'] = user['network_name']
+        
         return jsonify({
             'message': 'Login realizado com sucesso', 
             'success': True,
             'city': user['city'],
-            'is_admin': bool(user['is_admin'])
+            'is_admin': True,
+            'network_name': user['network_name']
         })
     else:
         return jsonify({'error': 'Credenciais inválidas', 'success': False}), 401
@@ -131,33 +162,90 @@ def logout():
 def check_auth():
     return jsonify({
         'is_admin': session.get('is_admin', False),
-        'city': session.get('city', None)
+        'city': session.get('city', None),
+        'network_name': session.get('network_name', None),
+        'connected_network_id': session.get('connected_network_id', None) # For public users
     })
 
-@app.route('/create_user', methods=['POST'])
-def create_user():
-    if not session.get('is_admin'):
-        return jsonify({'error': 'Acesso negado.'}), 403
+# --- Network & Admin Management ---
 
+@app.route('/register_admin', methods=['POST'])
+def register_admin():
+    # Only Super Admin or Public Registration? 
+    # Requirement: "coloca a parte para criar a conta". This implies Public Registration for Network Owners.
+    # So no auth required effectively, or maybe minimal? Let's make it public for "Signup".
+    
     data = request.json
     email = data.get('email')
     password = data.get('password')
     city = data.get('city')
+    network_name = data.get('network_name')
+    network_pass = data.get('network_password')
     
-    if not email or not password or not city:
+    if not all([email, password, city, network_name, network_pass]):
         return jsonify({'error': 'Preencha todos os campos'}), 400
 
     db = get_db()
     try:
-        hashed = generate_password_hash(password)
-        db.execute('INSERT INTO users (email, password, city, is_admin) VALUES (?, ?, ?, ?)',
-                   (email, hashed, city, 1)) # Creating another admin
+        # Check if network exists
+        if db.execute('SELECT id FROM users WHERE network_name = ?', (network_name,)).fetchone():
+             return jsonify({'error': 'Nome da rede já existe. Escolha outro.'}), 400
+             
+        hashed_pw = generate_password_hash(password)
+        hashed_net_pw = generate_password_hash(network_pass)
+        
+        db.execute('''
+            INSERT INTO users (email, password, city, is_admin, network_name, network_password) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (email, hashed_pw, city, 1, network_name, hashed_net_pw))
+        
         db.commit()
-        return jsonify({'message': 'Usuário criado com sucesso!'})
+        return jsonify({'message': 'Conta e Rede criadas com sucesso! Faça login.'})
     except sqlite3.IntegrityError:
         return jsonify({'error': 'E-mail já cadastrado'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/get_networks', methods=['GET'])
+def get_networks():
+    city = request.args.get('city')
+    if not city: return jsonify({'networks': []})
+    
+    db = get_db()
+    # List networks in this city
+    rows = db.execute('SELECT id, network_name, email FROM users WHERE city = ? AND network_name IS NOT NULL', (city,)).fetchall()
+    
+    idx_admin = 'admin@123' # Hide super admin "Admin Master" if we want, or show it? 
+    # Let's simple list all.
+    networks = []
+    for r in rows:
+        networks.append({
+            'id': r['id'],
+            'name': r['network_name'],
+            'owner': r['email']
+        })
+    return jsonify({'networks': networks})
+
+@app.route('/join_network', methods=['POST'])
+def join_network():
+    data = request.json
+    network_id = data.get('network_id')
+    password = data.get('password')
+    
+    db = get_db()
+    user = db.execute('SELECT * FROM users WHERE id = ?', (network_id,)).fetchone()
+    
+    if user and check_password_hash(user['network_password'], password):
+        # Public User "Session"
+        session.clear()
+        session['connected_network_id'] = user['id']
+        session['city'] = user['city'] # Inherit city
+        session['network_name'] = user['network_name']
+        session['is_admin'] = False
+        
+        return jsonify({'success': True, 'message': f'Conectado à rede {user["network_name"]}'})
+    else:
+        return jsonify({'error': 'Senha da rede incorreta.'}), 401
 
 # --- File Management ---
 
@@ -179,9 +267,11 @@ def upload_master():
         file.save(file_path)
         
         # Save metadata to DB
-        city = session.get('city', 'Desconhecida') # Fallback
+        city = session.get('city', 'Desconhecida')
+        user_id = session.get('user_id') # Current Admin
+        
         db = get_db()
-        db.execute('INSERT INTO files (filename, city) VALUES (?, ?)', (filename, city))
+        db.execute('INSERT INTO files (filename, city, user_id) VALUES (?, ?, ?)', (filename, city, user_id))
         db.commit()
 
         return jsonify({'message': f'Planilha "{filename}" carregada com sucesso para {city}!'})
@@ -190,105 +280,87 @@ def upload_master():
 
 @app.route('/list_masters', methods=['GET'])
 def list_masters():
-    # Filter by user role/city
-    # Admin: Sees ONLY their city's files (as per requirement: "admin de sorocaba deve ver apenas ... sorocaba")
-    # User: Sees files for the city they SELECTED (passed via query param? Or logic handled in frontend?)
-    # "ja o usuario que apenas puxa a planilha ... fazer com que ele tbm tenha que colocar a cidade dele"
-    
-    target_city = None
-    
-    if session.get('is_admin'):
-        target_city = session.get('city')
-    else:
-        # Public user (Audit Mode) requesting specific city
-        # Frontend should pass ?city=Sorocaba
-        target_city = request.args.get('city')
-        
-    masters = []
-    
-    # Check valid files on disk AND DB
-    # If DB Empty (legacy), fallback to all? Or just scan disk? 
-    # Plan: Scan DB for filtered files. Verify disk existence.
+    # Filter Logic:
+    # 1. If Admin: Show files owned by ME (user_id).
+    # 2. If Public Network User: Show files owned by connected_network_id.
+    # 3. Super Admin (admin@123): Show ? Maybe everything or just his? 
+    #    Let's stick to "owned by me" for admins to keep it simple. 
+    #    Or if super admin, show all? "log in admin123 must enter in all without restriction".
+    #    So if is_super_admin (check email), show all?
     
     db = get_db()
-    query = "SELECT filename FROM files"
+    query = "SELECT filename FROM files WHERE 1=1"
     params = []
     
-    if target_city:
-        query += " WHERE city = ?"
-        params.append(target_city)
+    user_id = session.get('user_id')
+    connected_net = session.get('connected_network_id')
+    
+    # Check for Super Admin
+    is_super = False
+    if user_id:
+         u = db.execute('SELECT email FROM users WHERE id = ?', (user_id,)).fetchone()
+         if u and u['email'] == 'admin@123':
+             is_super = True
+    
+    if is_super:
+        pass # No filter
+    elif user_id:
+        # Normal Admin: See only my files
+        query += " AND user_id = ?"
+        params.append(user_id)
+    elif connected_net:
+        # Public User: See files of the network owner
+        query += " AND user_id = ?"
+        params.append(connected_net)
     else:
-        # If no city selected/admin logged in, maybe show nothing or all?
-        # Requirement: "se tiver mais de um admin em cidades diferentes... admin de sorocaba deve ver apenas...sorocaba"
-        # Implies strict filtering.
-        # But if we haven't migrated legacy files to DB, they won't show up.
-        # Let's handle legacy: If not in DB, maybe they are "Global"?
-        # For now, let's serve from DB.
-        pass
+        return jsonify({'masters': []}) # No access
 
     rows = db.execute(query, tuple(params)).fetchall()
     db_files = {row['filename'] for row in rows}
     
-    # Also scan disk for manual uploads/legacy NOT in DB?
-    # If file on disk but not in DB -> Orphans. 
-    # Let's list Orphans if user is Admin? 
-    # "manter como esta" -> Existing works.
-    # Let's simple return DB matches that exist on disk.
-    
-    if os.path.exists(app.config['UPLOAD_FOLDER']):
-        for f in os.listdir(app.config['UPLOAD_FOLDER']):
-            # If in DB and matches filter OR (if files table is empty and we want to list everything? No, restrict).
-            # If we want to support legacy files, we should probably insert them into DB with 'Sorocaba' (default) on first run?
-            # Or just list them if target_city matches default.
-            
-            # Simple Logic:
-            # If f in db_files -> It matches criteria.
-            # If files table is empty, return all (Legacy mode)?
-            # Let's count DB.
-            pass
-
-    # Re-impl:
     valid_files = []
-    for row in rows:
-        f = row['filename']
-        if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], f)):
-             valid_files.append(f)
-             
-    # Fallback for Legacy (Startup): If Files table is empty, treat all existing files as 'Sorocaba' (Default Admin City)
-    # This is a bit magic, but helps migration.
-    count = db.execute('SELECT COUNT(*) as c FROM files').fetchone()['c']
-    if count == 0:
+    # Only return files that exist on disk
+    if os.path.exists(app.config['UPLOAD_FOLDER']):
+         for f in os.listdir(app.config['UPLOAD_FOLDER']):
+             if f in db_files:
+                 valid_files.append(f)
+                 
+    # Special case: If Super Admin, show everything even if not in DB? 
+    # "admin123 deve conseguir entrar em tudo". 
+    # Let's act as if he sees everything on disk for legacy support too.
+    if is_super:
+        valid_files = [] # Reset
         if os.path.exists(app.config['UPLOAD_FOLDER']):
              for f in os.listdir(app.config['UPLOAD_FOLDER']):
-                 if f.endswith('.xlsx'):
-                     if target_city == 'Sorocaba' or not target_city: # Show all if no city
-                         valid_files.append(f)
-
+                 if f.endswith('.xlsx') and not f.startswith('~$'):
+                     valid_files.append(f)
+                     
     return jsonify({'masters': sorted(valid_files)})
 
 @app.route('/delete_master', methods=['POST'])
 def delete_master():
     if not session.get('is_admin'):
-        return jsonify({'error': 'Acesso negado. Requer privilégios de administrador.'}), 403
+        return jsonify({'error': 'Acesso negado.'}), 403
 
     data = request.json
     filename = data.get('filename')
     
-    if not filename:
-         return jsonify({'error': 'Nome do arquivo não fornecido'}), 400
-
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    
-    # Also delete from DB
+    # Check ownership
     db = get_db()
-    # Ensure admin only deletes their city's files?
-    # "admin de sorocaba deve ver apenas oq foi enviado por sorocaba"
-    admin_city = session.get('city')
+    user_id = session.get('user_id')
     
-    # Check if file belongs to admin's city
-    file_rec = db.execute('SELECT city FROM files WHERE filename = ?', (filename,)).fetchone()
-    if file_rec and file_rec['city'] != admin_city:
-         return jsonify({'error': 'Você não tem permissão para remover arquivos de outra cidade.'}), 403
+    # Check if Super Admin
+    is_super = False
+    if user_id:
+         u = db.execute('SELECT email FROM users WHERE id = ?', (user_id,)).fetchone()
+         if u and u['email'] == 'admin@123':
+             is_super = True
+
+    if not is_super:
+        # Verify ownership
+        file_rec = db.execute('SELECT user_id FROM files WHERE filename = ?', (filename,)).fetchone()
+        if file_rec and file_rec['user_id'] != user_id:
+             return jsonify({'error': 'Você não tem permissão para remover este arquivo.'}), 403
 
     if os.path.exists(file_path):
         try:
