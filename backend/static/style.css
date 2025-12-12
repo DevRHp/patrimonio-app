@@ -469,17 +469,70 @@ footer {
 }
 
 /* Responsiveness */
+/* Responsiveness */
+.landing-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Helper, but can prevent scroll if not handled */
+    z-index: 2000;
+    transition: opacity 0.5s ease;
+    overflow-y: auto; /* Allow Scroll! */
+}
+
+/* Ensure content is center but scrolls if too tall */
+.landing-content {
+    text-align: center;
+    max-width: 1000px;
+    width: 100%;
+    padding: 40px 20px;
+    margin: auto; /* Centers vertically if flex parent allows, or top if scrolls */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    min-height: min-content; /* Ensure it takes height */
+}
+
+/* Form Grid System */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 cols */
+    gap: 20px;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.form-full {
+    grid-column: 1 / -1; /* Span all cols */
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+/* Mobile Adjustments */
 @media (max-width: 768px) {
     .container {
         padding: 20px 15px;
     }
     
     .landing-content {
-        padding: 20px;
+        padding: 40px 20px; /* More padding top/bottom to avoid cutting edge */
+        margin: 0 auto;
+        justify-content: flex-start; /* Start from top on mobile */
     }
 
     .landing-logo {
         max-width: 80%;
+        margin-top: 20px;
     }
 
     h1 {
@@ -512,5 +565,10 @@ footer {
     
     .file-list-item div {
         align-self: flex-end;
+    }
+
+    /* Stack Form Grid on Mobile */
+    .form-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -163,33 +163,41 @@
     </div>
 
     <!-- Screen 3.5: Register Admin/Network -->
+    <!-- Screen 3.5: Register Admin/Network -->
     <div id="register-screen" class="landing-page hidden">
         <div class="landing-content">
             <h1>Criar Nova Rede</h1>
             <p class="subtitle">Crie um acesso administrativo e sua rede segura</p>
 
-            <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto;">
-                <label>E-mail (Login Admin)</label>
-                <input type="email" id="reg-email" placeholder="admin@empresa.com">
-            </div>
-            <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto;">
-                <label>Senha (Login Admin)</label>
-                <input type="password" id="reg-password" placeholder="Senha Forte">
-            </div>
-            <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto;">
-                <label>Cidade</label>
-                <input type="text" id="reg-city" placeholder="Ex: Sorocaba">
-            </div>
-            <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto;">
-                <label>Nome da Rede (Ex: SESI-CE 123)</label>
-                <input type="text" id="reg-network-name" placeholder="Ex: SESI CE-123">
-            </div>
-            <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto 20px auto;">
-                <label>Senha da Rede (Para Auditores)</label>
-                <input type="password" id="reg-network-pass" placeholder="Senha para entrar na rede">
+            <div class="form-grid">
+                <!-- Admin Account -->
+                <div class="form-group">
+                    <label>E-mail (Login Admin)</label>
+                    <input type="email" id="reg-email" placeholder="admin@empresa.com">
+                </div>
+                <div class="form-group">
+                    <label>Senha (Login Admin)</label>
+                    <input type="password" id="reg-password" placeholder="Senha Forte">
+                </div>
+
+                <!-- City -->
+                <div class="form-group form-full">
+                    <label>Cidade</label>
+                    <input type="text" id="reg-city" placeholder="Ex: Sorocaba">
+                </div>
+
+                <!-- Network -->
+                <div class="form-group">
+                    <label>Nome da Rede (Ex: SESI-CE 123)</label>
+                    <input type="text" id="reg-network-name" placeholder="Ex: SESI CE-123">
+                </div>
+                <div class="form-group">
+                    <label>Senha da Rede (Para Auditores)</label>
+                    <input type="password" id="reg-network-pass" placeholder="Senha para entrar na rede">
+                </div>
             </div>
 
-            <button id="btn-do-register" class="btn success large">Criar Conta</button>
+            <button id="btn-do-register" class="btn success large" style="margin-top:20px;">Criar Conta</button>
 
             <button id="btn-back-login" class="btn link-style" style="margin-top:20px; color: #666;">
                 <i class="fas fa-arrow-left"></i> Voltar ao Login
