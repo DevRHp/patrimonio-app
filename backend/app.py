@@ -2,7 +2,9 @@ import os
 import zipfile
 import io
 import time
-from flask import Flask, render_template, request, send_file, jsonify, session
+import sqlite3
+from flask import Flask, render_template, request, send_file, jsonify, session, g
+from werkzeug.security import generate_password_hash, check_password_hash
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 from copy import copy
@@ -11,6 +13,68 @@ import re
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_sesi_sorocaba' # Change this in production!
+DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
+
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
+    return db
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
+
+def init_db():
+    with app.app_context():
+        db = get_db()
+        # Users Table
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                city TEXT NOT NULL,
+                is_admin INTEGER DEFAULT 0
+            )
+        ''')
+        # Files Table (Metadata for uploads)
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                city TEXT NOT NULL,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create Default Admin if not exists
+        # Default City: Sorocaba (as per context)
+        # Check if any admin exists
+        cur = db.execute('SELECT * FROM users WHERE email = ?', ('admin@123',))
+        if not cur.fetchone():
+            default_pass = generate_password_hash('admin123')
+            db.execute('INSERT INTO users (email, password, city, is_admin) VALUES (?, ?, ?, ?)',
+                       ('admin@123', default_pass, 'Sorocaba', 1))
+            db.commit()
+            print("Default admin created: admin@123 / admin123 (City: Sorocaba)")
+
+@app.route('/get_active_cities', methods=['GET'])
+def get_active_cities():
+    db = get_db()
+    # Cities defined by Admins
+    rows = db.execute('SELECT DISTINCT city FROM users').fetchall()
+    cities = [r['city'] for r in rows]
+    
+    # Also include cities from files just in case (e.g. legacy or orphan files if we supported them better, but users table is safer source of truth for "branches")
+    # Actually, let's just use users.
+    return jsonify({'cities': sorted(list(set(cities)))})
+
+# Initialize on import (or handle via main block, but here at top level is easiest for single-file Flask app)
+init_db()
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,20 +106,58 @@ def login():
     email = data.get('email')
     password = data.get('password')
 
-    if email == 'admin@123' and password == 'admin123':
-        session['is_admin'] = True
-        return jsonify({'message': 'Login realizado com sucesso', 'success': True})
+    db = get_db()
+    user = db.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+
+    if user and check_password_hash(user['password'], password):
+        session['user_id'] = user['id']
+        session['is_admin'] = bool(user['is_admin'])
+        session['city'] = user['city']
+        return jsonify({
+            'message': 'Login realizado com sucesso', 
+            'success': True,
+            'city': user['city'],
+            'is_admin': bool(user['is_admin'])
+        })
     else:
         return jsonify({'error': 'Credenciais inválidas', 'success': False}), 401
 
 @app.route('/logout', methods=['POST'])
 def logout():
-    session.pop('is_admin', None)
+    session.clear()
     return jsonify({'message': 'Logout realizado com sucesso'})
 
 @app.route('/check_auth', methods=['GET'])
 def check_auth():
-    return jsonify({'is_admin': session.get('is_admin', False)})
+    return jsonify({
+        'is_admin': session.get('is_admin', False),
+        'city': session.get('city', None)
+    })
+
+@app.route('/create_user', methods=['POST'])
+def create_user():
+    if not session.get('is_admin'):
+        return jsonify({'error': 'Acesso negado.'}), 403
+
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    city = data.get('city')
+    
+    if not email or not password or not city:
+        return jsonify({'error': 'Preencha todos os campos'}), 400
+
+    db = get_db()
+    try:
+        hashed = generate_password_hash(password)
+        db.execute('INSERT INTO users (email, password, city, is_admin) VALUES (?, ?, ?, ?)',
+                   (email, hashed, city, 1)) # Creating another admin
+        db.commit()
+        return jsonify({'message': 'Usuário criado com sucesso!'})
+    except sqlite3.IntegrityError:
+        return jsonify({'error': 'E-mail já cadastrado'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # --- File Management ---
 
@@ -75,20 +177,94 @@ def upload_master():
         filename = file.filename
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
-        return jsonify({'message': f'Planilha "{filename}" carregada com sucesso!'})
+        
+        # Save metadata to DB
+        city = session.get('city', 'Desconhecida') # Fallback
+        db = get_db()
+        db.execute('INSERT INTO files (filename, city) VALUES (?, ?)', (filename, city))
+        db.commit()
+
+        return jsonify({'message': f'Planilha "{filename}" carregada com sucesso para {city}!'})
     
     return jsonify({'error': 'Formato de arquivo inválido. Apenas .xlsx'}), 400
 
 @app.route('/list_masters', methods=['GET'])
 def list_masters():
+    # Filter by user role/city
+    # Admin: Sees ONLY their city's files (as per requirement: "admin de sorocaba deve ver apenas ... sorocaba")
+    # User: Sees files for the city they SELECTED (passed via query param? Or logic handled in frontend?)
+    # "ja o usuario que apenas puxa a planilha ... fazer com que ele tbm tenha que colocar a cidade dele"
+    
+    target_city = None
+    
+    if session.get('is_admin'):
+        target_city = session.get('city')
+    else:
+        # Public user (Audit Mode) requesting specific city
+        # Frontend should pass ?city=Sorocaba
+        target_city = request.args.get('city')
+        
     masters = []
+    
+    # Check valid files on disk AND DB
+    # If DB Empty (legacy), fallback to all? Or just scan disk? 
+    # Plan: Scan DB for filtered files. Verify disk existence.
+    
+    db = get_db()
+    query = "SELECT filename FROM files"
+    params = []
+    
+    if target_city:
+        query += " WHERE city = ?"
+        params.append(target_city)
+    else:
+        # If no city selected/admin logged in, maybe show nothing or all?
+        # Requirement: "se tiver mais de um admin em cidades diferentes... admin de sorocaba deve ver apenas...sorocaba"
+        # Implies strict filtering.
+        # But if we haven't migrated legacy files to DB, they won't show up.
+        # Let's handle legacy: If not in DB, maybe they are "Global"?
+        # For now, let's serve from DB.
+        pass
+
+    rows = db.execute(query, tuple(params)).fetchall()
+    db_files = {row['filename'] for row in rows}
+    
+    # Also scan disk for manual uploads/legacy NOT in DB?
+    # If file on disk but not in DB -> Orphans. 
+    # Let's list Orphans if user is Admin? 
+    # "manter como esta" -> Existing works.
+    # Let's simple return DB matches that exist on disk.
+    
     if os.path.exists(app.config['UPLOAD_FOLDER']):
         for f in os.listdir(app.config['UPLOAD_FOLDER']):
-            if f.endswith('.xlsx') and not f.startswith('~$') and f != 'master_spreadsheet.xlsx':
-                 # Filtering out old default name if desired, or keep it.
-                 # Also avoid temp excel files (~$)
-                 masters.append(f)
-    return jsonify({'masters': masters})
+            # If in DB and matches filter OR (if files table is empty and we want to list everything? No, restrict).
+            # If we want to support legacy files, we should probably insert them into DB with 'Sorocaba' (default) on first run?
+            # Or just list them if target_city matches default.
+            
+            # Simple Logic:
+            # If f in db_files -> It matches criteria.
+            # If files table is empty, return all (Legacy mode)?
+            # Let's count DB.
+            pass
+
+    # Re-impl:
+    valid_files = []
+    for row in rows:
+        f = row['filename']
+        if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], f)):
+             valid_files.append(f)
+             
+    # Fallback for Legacy (Startup): If Files table is empty, treat all existing files as 'Sorocaba' (Default Admin City)
+    # This is a bit magic, but helps migration.
+    count = db.execute('SELECT COUNT(*) as c FROM files').fetchone()['c']
+    if count == 0:
+        if os.path.exists(app.config['UPLOAD_FOLDER']):
+             for f in os.listdir(app.config['UPLOAD_FOLDER']):
+                 if f.endswith('.xlsx'):
+                     if target_city == 'Sorocaba' or not target_city: # Show all if no city
+                         valid_files.append(f)
+
+    return jsonify({'masters': sorted(valid_files)})
 
 @app.route('/delete_master', methods=['POST'])
 def delete_master():
@@ -103,14 +279,30 @@ def delete_master():
 
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
+    # Also delete from DB
+    db = get_db()
+    # Ensure admin only deletes their city's files?
+    # "admin de sorocaba deve ver apenas oq foi enviado por sorocaba"
+    admin_city = session.get('city')
+    
+    # Check if file belongs to admin's city
+    file_rec = db.execute('SELECT city FROM files WHERE filename = ?', (filename,)).fetchone()
+    if file_rec and file_rec['city'] != admin_city:
+         return jsonify({'error': 'Você não tem permissão para remover arquivos de outra cidade.'}), 403
+
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
+            db.execute('DELETE FROM files WHERE filename = ?', (filename,))
+            db.commit()
             return jsonify({'message': f'Planilha "{filename}" removida com sucesso'})
         except Exception as e:
             return jsonify({'error': f'Erro ao remover: {str(e)}'}), 500
     else:
-        return jsonify({'error': 'Planilha não encontrada'}), 404
+        # Just clean DB if file missing
+        db.execute('DELETE FROM files WHERE filename = ?', (filename,))
+        db.commit()
+        return jsonify({'error': 'Planilha não encontrada (DB Limpo)'}), 404
 
 @app.route('/get_master/<filename>', methods=['GET'])
 def get_master(filename):
@@ -328,46 +520,63 @@ def verify():
                     cell.fill = green_fill
 
         # --- 2. Missing Items (Sheet 2: Nao Encontrados) ---
-        # Strategy: Clone source sheet, delete rows that WERE found.
-        missing_ws = wb.copy_worksheet(source_ws)
-        missing_ws.title = "Nao Encontrados"
-        
-        # We need to identify which rows in the source were found, so we can delete them.
-        # We iterate in reverse order to avoid index shifting problems when deleting.
-        rows_to_delete = []
-        # source_ws.iter_rows gives us cells. We need 1-based index.
-        # Enumerate starts at 0, so row_idx = i + min_row (2)
-        for i, row in enumerate(missing_ws.iter_rows(min_row=2, values_only=True)):
-            row_idx = i + 2
+        missing_ws = wb.create_sheet("Nao Encontrados")
+        # Copy column dimensions
+        for col_name, col_dim in source_ws.column_dimensions.items():
+            missing_ws.column_dimensions[col_name].width = col_dim.width
+
+        # Copy Header
+        for row in source_ws.iter_rows(min_row=1, max_row=1):
+            missing_ws.append([cell.value for cell in row])
+            for i, cell in enumerate(row):
+                new_cell = missing_ws.cell(row=1, column=i+1)
+                if cell.has_style:
+                    new_cell.font = copy(cell.font)
+                    new_cell.border = copy(cell.border)
+                    new_cell.fill = copy(cell.fill)
+                    new_cell.number_format = copy(cell.number_format)
+                    new_cell.protection = copy(cell.protection)
+                    new_cell.alignment = copy(cell.alignment)
+
+        # Copy Missing Rows
+        current_row_idx = 2
+        for row in source_ws.iter_rows(min_row=2):
             is_found = False
-            for val in row:
-                if val is not None and str(val).strip() in scanned_codes:
+            for cell in row:
+                if cell.value is not None and str(cell.value).strip() in found_in_room_codes:
                     is_found = True
                     break
             
-            if is_found:
-                rows_to_delete.append(row_idx)
-        
-        # Delete rows in reverse order
-        for row_idx in reversed(rows_to_delete):
-            missing_ws.delete_rows(row_idx, 1)
+            if not is_found:
+                for i, cell in enumerate(row):
+                    new_cell = missing_ws.cell(row=current_row_idx, column=i+1, value=cell.value)
+                    if cell.has_style:
+                        new_cell.font = copy(cell.font)
+                        new_cell.border = copy(cell.border)
+                        new_cell.fill = copy(cell.fill)
+                        new_cell.number_format = copy(cell.number_format)
+                        new_cell.protection = copy(cell.protection)
+                        new_cell.alignment = copy(cell.alignment)
+                current_row_idx += 1
 
 
         # --- 3. Wrong Location Items (Sheet 3: Local Incorreto) ---
-        # Strategy: Clone source sheet (to preserve headers/styles), clear data, populate with found items + Location col
+        # Strategy: Copy source sheet structure (to preserve headers/styles), clear data, populate with found items + Location col
         wrong_location_ws = wb.copy_worksheet(source_ws)
         wrong_location_ws.title = "Local Incorreto"
         
         # Clear all data rows (keep header at row 1)
-        max_r = wrong_location_ws.max_row
-        if max_r > 1:
-            wrong_location_ws.delete_rows(2, max_r - 1)
+        # It's safer to delete rows from bottom up to avoid index shifting issues, but for clearing content we can just iterate.
+        # Actually, delete_rows is better to clear styles/values
+        max_row = wrong_location_ws.max_row
+        if max_row > 1:
+            wrong_location_ws.delete_rows(2, max_row - 1)
             
         # Add new header column for "Encontrado Em"
-        max_c = wrong_location_ws.max_column
-        new_header_cell = wrong_location_ws.cell(row=1, column=max_c + 1, value="Encontrado Em (Sala Real)")
+        max_col = wrong_location_ws.max_column
+        new_header_cell = wrong_location_ws.cell(row=1, column=max_col + 1, value="Encontrado Em (Sala Real)")
         # Copy style from previous header cell
-        ref_header = wrong_location_ws.cell(row=1, column=max_c)
+        ref_header = wrong_location_ws.cell(row=1, column=max_col)
         if ref_header.has_style:
             new_header_cell.font = copy(ref_header.font)
             new_header_cell.border = copy(ref_header.border)
@@ -393,7 +602,7 @@ def verify():
                 try:
                     wb_search = load_workbook(fpath, read_only=True, data_only=True)
                     for sheet_name in wb_search.sheetnames:
-                        # Skip if it's the target room we already checked
+                        # Skip if it's the target room we already checked (unless it's a different file with same sheet name?? unlikely but safer to check file too)
                         if fname == source_file and sheet_name == selected_room:
                             continue
                         
@@ -431,7 +640,7 @@ def verify():
                 wrong_location_ws.append(row_data)
             else:
                 # Not found anywhere
-                wrong_location_ws.append([code, "Nao Encontrado nas planilhas"] + ([""] * (max_c - 2)) + ["Nao encontrado"])
+                wrong_location_ws.append([code, "Nao Encontrado nas planilhas"] + ([""] * (max_col - 2)) + ["Nao encontrado"])
 
 
         # --- Save and Zip ---

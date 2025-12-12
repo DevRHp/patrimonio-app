@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,7 +19,11 @@
             justify-content: space-between;
             align-items: center;
         }
-        .file-list-item span { font-weight: 500; }
+
+        .file-list-item span {
+            font-weight: 500;
+        }
+
         .checkbox-group {
             max-height: 200px;
             overflow-y: auto;
@@ -27,6 +32,7 @@
             border-radius: 8px;
             background: #f9f9f9;
         }
+
         .checkbox-item {
             display: flex;
             align-items: center;
@@ -34,10 +40,18 @@
             padding: 8px 0;
             border-bottom: 1px solid #eee;
         }
-        .checkbox-item:last-child { border-bottom: none; }
-        .checkbox-item input[type="checkbox"] { width: auto; margin: 0; }
+
+        .checkbox-item:last-child {
+            border-bottom: none;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
     </style>
 </head>
+
 <body>
     <!-- Screen 1: Intro / Splash -->
     <div id="intro-screen" class="landing-page show">
@@ -45,7 +59,7 @@
             <img src="{{ url_for('static', filename='logo.png') }}" alt="FabLab Logo" class="landing-logo">
             <h1>Sistema de Auditoria Patrimonial</h1>
             <p class="subtitle">SESI Sorocaba</p>
-            
+
             <div class="developers" style="margin: 30px 0;">
                 <div class="role-group">
                     <p class="role">Desenvolvedor</p>
@@ -55,7 +69,7 @@
                     <p class="role">Orientador</p>
                     <p class="name">Marcelo Dias de Freitas Junior</p>
                 </div>
-                 <div class="role-group">
+                <div class="role-group">
                     <p class="role">Técnico de Teatro</p>
                     <p class="name">Leonardo Oliveira de Camargo</p>
                 </div>
@@ -72,7 +86,7 @@
         <div class="landing-content">
             <h1>Escolha o Tipo de Acesso</h1>
             <p class="subtitle">Como deseja entrar no sistema?</p>
-            
+
             <div class="action-buttons-vertical">
                 <button id="btn-user-access" class="btn primary large">
                     <i class="fas fa-user-check"></i> Área do Usuário
@@ -81,8 +95,24 @@
                     <i class="fas fa-lock"></i> Acesso Administrativo
                 </button>
             </div>
-            
-             <button id="btn-back-intro" class="btn link-style" style="margin-top:20px; color: #666;">
+
+            <button id="btn-back-intro" class="btn link-style" style="margin-top:20px; color: #666;">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </button>
+        </div>
+    </div>
+
+    <!-- Screen 2.5: City Selection (For Users) -->
+    <div id="city-selection-screen" class="landing-page hidden bg-variant">
+        <div class="landing-content">
+            <h1>Selecione sua Cidade</h1>
+            <p class="subtitle">Onde você está realizando a auditoria?</p>
+
+            <div id="city-list-container" class="action-buttons-vertical" style="max-height: 300px; overflow-y: auto;">
+                <p>Carregando cidades...</p>
+            </div>
+
+            <button id="btn-back-role-city" class="btn link-style" style="margin-top:20px; color: #666;">
                 <i class="fas fa-arrow-left"></i> Voltar
             </button>
         </div>
@@ -93,7 +123,7 @@
         <div class="landing-content">
             <h1>Login Administrativo</h1>
             <p class="subtitle">Informe suas credenciais</p>
-            
+
             <div class="form-group" style="text-align: left; max-width: 300px; margin: 0 auto;">
                 <label for="admin-email">E-mail</label>
                 <input type="text" id="admin-email" placeholder="usuario@123">
@@ -102,9 +132,9 @@
                 <label for="admin-password">Senha</label>
                 <input type="password" id="admin-password" placeholder="usuario123">
             </div>
-            
+
             <button id="btn-do-login" class="btn primary large">Entrar</button>
-            
+
             <button id="btn-back-role" class="btn link-style" style="margin-top:20px; color: #666;">
                 <i class="fas fa-arrow-left"></i> Voltar
             </button>
@@ -116,23 +146,24 @@
             <div class="logo-area">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="FabLab Logo" class="logo">
                 <h1>Sistema de Auditoria Patrimonial</h1>
-                <p>SESI Sorocaba</p>
+                <p>SESI <span id="header-city-name">Sorocaba</span></p>
             </div>
             <div id="header-actions" class="hidden">
-                 <button id="btn-logout" class="btn secondary" style="width: auto; padding: 5px 15px; font-size: 0.9rem;">Sair</button>
+                <button id="btn-logout" class="btn secondary"
+                    style="width: auto; padding: 5px 15px; font-size: 0.9rem;">Sair</button>
             </div>
         </header>
 
         <main>
             <!-- USER AREA -->
             <section id="user-section" class="hidden">
-                
+
                 <!-- Step 1: Select Files -->
                 <section class="card">
                     <div class="card-header">
                         <div class="header-title">
                             <div class="step-number">1</div>
-                            <h2>Seleção de Planilhas</h2>
+                            <h2>Seleção de Planilhas (<span id="user-city-display"></span>)</h2>
                         </div>
                     </div>
                     <div class="card-body">
@@ -146,7 +177,7 @@
 
                 <!-- Step 2: Audit -->
                 <section id="user-audit-step" class="card disabled">
-                     <div class="card-header">
+                    <div class="card-header">
                         <div class="header-title">
                             <div class="step-number"><i class="fas fa-clipboard-check"></i></div>
                             <h2>Dados da Auditoria</h2>
@@ -167,20 +198,21 @@
 
                         <div class="form-group">
                             <label for="scanned-codes">Códigos Bipados</label>
-                            <textarea id="scanned-codes" placeholder="Cole aqui os códigos bipados (um por linha)..."></textarea>
+                            <textarea id="scanned-codes"
+                                placeholder="Cole aqui os códigos bipados (um por linha)..."></textarea>
                         </div>
 
                         <button id="btn-verify" class="btn success">
                             <i class="fas fa-check-circle"></i> Verificar e Gerar Relatório
                         </button>
-                         <button id="btn-back-home" class="btn secondary">Voltar</button>
+                        <button id="btn-back-home" class="btn secondary">Voltar</button>
                     </div>
                 </section>
             </section>
 
             <!-- ADMIN AREA -->
             <section id="admin-section" class="hidden">
-                 <div class="card" style="background: transparent; box-shadow: none; margin-bottom: 10px;">
+                <div class="card" style="background: transparent; box-shadow: none; margin-bottom: 10px;">
                     <button id="btn-admin-back" class="btn link-style" style="color: #666; width: auto; float: left;">
                         <i class="fas fa-arrow-left"></i> Voltar (Sair)
                     </button>
@@ -192,19 +224,39 @@
                     <div style="clear:both;"></div>
                 </div>
 
+                <!-- Admin: User Management -->
+                <section class="card" id="admin-user-mgmt">
+                    <div class="card-header">
+                        <div class="header-title">
+                            <div class="step-number"><i class="fas fa-users-cog"></i></div>
+                            <h2>Gerenciar Usuários</h2>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="description">Adicionar novo administrador/usuário para uma cidade.</p>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <input type="email" id="new-user-email" placeholder="Email" style="flex: 1;">
+                            <input type="password" id="new-user-pass" placeholder="Senha" style="flex: 1;">
+                            <input type="text" id="new-user-city" placeholder="Cidade (Ex: Votorantim)"
+                                style="flex: 1;">
+                            <button id="btn-create-user" class="btn success" style="width: auto;">Criar</button>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Manage Masters -->
                 <section class="card">
                     <div class="card-header">
                         <div class="header-title">
-                             <div class="step-number">1</div>
-                             <h2>Gerenciar Planilhas Mãe</h2>
+                            <div class="step-number">1</div>
+                            <h2>Gerenciar Planilhas Mãe</h2>
                         </div>
                     </div>
                     <div class="card-body">
                         <div id="admin-file-list" style="margin-bottom: 20px;">
-                             <!-- Populated by JS -->
+                            <!-- Populated by JS -->
                         </div>
-                        
+
                         <div id="upload-container">
                             <p class="description">Carregar nova planilha:</p>
                             <div class="upload-area" id="drop-zone">
@@ -219,18 +271,19 @@
                 </section>
 
                 <!-- Reports List -->
-                 <section class="card">
-                     <div class="card-header">
+                <section class="card">
+                    <div class="card-header">
                         <div class="header-title">
-                             <div class="step-number">2</div>
-                             <h2>Relatórios Gerados</h2>
+                            <div class="step-number">2</div>
+                            <h2>Relatórios Gerados</h2>
                         </div>
-                        <button id="btn-refresh-reports" class="btn secondary" style="width: auto; padding: 5px 10px;"><i class="fas fa-sync"></i></button>
+                        <button id="btn-refresh-reports" class="btn secondary"
+                            style="width: auto; padding: 5px 10px;"><i class="fas fa-sync"></i></button>
                     </div>
                     <div class="card-body">
-                         <ul id="reports-list" class="reports-list">
-                             <li class="report-item">Carregando...</li>
-                         </ul>
+                        <ul id="reports-list" class="reports-list">
+                            <li class="report-item">Carregando...</li>
+                        </ul>
                     </div>
                 </section>
             </section>
@@ -247,148 +300,236 @@
     </div>
 
     <script>
-        // --- Shared Logic ---
+        // --- Global State ---
+        let currentUserCity = null;
         const loadingOverlay = document.getElementById('loading-overlay');
-        const showLoading = (show, msg) => {
-            loadingOverlay.classList.toggle('hidden', !show);
-            if(msg) loadingOverlay.querySelector('p').textContent = msg;
+
+        // --- Screens ---
+        const screens = {
+            intro: document.getElementById('intro-screen'),
+            role: document.getElementById('role-selection-screen'),
+            city: document.getElementById('city-selection-screen'),
+            login: document.getElementById('admin-login-screen'),
+            app: document.getElementById('app-container')
         };
 
-        // --- Navigation ---
-        const introScreen = document.getElementById('intro-screen');
-        const roleScreen = document.getElementById('role-selection-screen');
-        const loginScreen = document.getElementById('admin-login-screen');
-        const appContainer = document.getElementById('app-container');
-        
-        // Intro -> Role
-        document.getElementById('btn-start').addEventListener('click', () => {
-            introScreen.classList.add('hidden');
-            roleScreen.classList.remove('hidden');
-            roleScreen.classList.add('fade-in');
-        });
+        // --- Shared Utils ---
+        const showLoading = (show, msg) => {
+            loadingOverlay.classList.toggle('hidden', !show);
+            if (msg) loadingOverlay.querySelector('p').textContent = msg;
+        };
 
-        // Role -> Intro (Back)
-        document.getElementById('btn-back-intro').addEventListener('click', () => {
-             roleScreen.classList.add('hidden');
-             introScreen.classList.remove('hidden');
-             introScreen.classList.add('fade-in');
-        });
-        
-        // Role -> Admin Login
-        document.getElementById('btn-admin-access').addEventListener('click', () => {
-            roleScreen.classList.add('hidden');
-            loginScreen.classList.remove('hidden');
-            loginScreen.classList.add('fade-in');
-        });
+        // --- Navigation System ---
+        function navigateTo(screenId, addToHistory = true) {
+            // Hide all
+            Object.values(screens).forEach(el => {
+                el.classList.add('hidden');
+                el.classList.remove('fade-in');
+            });
 
-        // Admin Login -> Role (Back)
-        document.getElementById('btn-back-role').addEventListener('click', () => {
-            loginScreen.classList.add('hidden');
-            roleScreen.classList.remove('hidden');
-            roleScreen.classList.add('fade-in');
-        });
+            // Show target
+            if (screens[screenId]) {
+                screens[screenId].classList.remove('hidden');
+                screens[screenId].classList.add('fade-in');
+            }
 
-        // Role -> App (User)
-        document.getElementById('btn-user-access').addEventListener('click', () => showApp(false));
-         
-        // Return Home
-        document.getElementById('btn-back-home').addEventListener('click', () => location.reload());
+            // Push History
+            if (addToHistory) {
+                history.pushState({ screen: screenId }, "", `#${screenId}`);
+            }
+        }
 
-        function showApp(isAdmin) {
-             // Hide whatever screen was active
-            roleScreen.classList.add('hidden');
-            loginScreen.classList.add('hidden');
-            
-            appContainer.classList.remove('hidden');
-            appContainer.classList.add('fade-in');
+        window.onpopstate = (event) => {
+            if (event.state && event.state.screen) {
+                navigateTo(event.state.screen, false);
+            } else {
+                navigateTo('intro', false); // Default
+            }
+        };
+
+        // Init
+        history.replaceState({ screen: 'intro' }, "", "#intro");
+
+
+        // --- Event Listeners (Navigation) ---
+        document.getElementById('btn-start').onclick = () => navigateTo('role');
+        document.getElementById('btn-back-intro').onclick = () => history.back();
+
+        document.getElementById('btn-admin-access').onclick = () => navigateTo('login');
+        document.getElementById('btn-back-role').onclick = () => history.back();
+
+        document.getElementById('btn-user-access').onclick = async () => {
+            await loadCities();
+            navigateTo('city');
+        };
+        document.getElementById('btn-back-role-city').onclick = () => history.back();
+
+        document.getElementById('btn-back-home').onclick = () => {
+            // Hard reset or just navigate back?
+            // "Voltar" in Audit screen -> reload or app start? 
+            // Reloading is safer to clear state.
+            location.href = '/';
+        };
+
+        document.getElementById('btn-logout').onclick = async () => {
+            await fetch('/logout', { method: 'POST' });
+            location.href = '/';
+        };
+
+        if (document.getElementById('btn-admin-back')) {
+            document.getElementById('btn-admin-back').onclick = async () => {
+                await fetch('/logout', { method: 'POST' });
+                location.href = '/';
+            };
+        }
+
+
+        // --- App Logic ---
+
+        function initApp(isAdmin, city) {
+            currentUserCity = city;
+            document.getElementById('header-city-name').textContent = city || "Indefinido";
 
             if (isAdmin) {
                 document.getElementById('admin-section').classList.remove('hidden');
                 document.getElementById('user-section').classList.add('hidden');
                 document.getElementById('header-actions').classList.remove('hidden');
+                document.getElementById('admin-user-mgmt').classList.remove('hidden');
                 loadAdminMasters();
                 loadReports();
             } else {
                 document.getElementById('user-section').classList.remove('hidden');
                 document.getElementById('admin-section').classList.add('hidden');
                 document.getElementById('header-actions').classList.add('hidden');
+                document.getElementById('user-city-display').textContent = city;
                 loadUserMasters();
             }
+            navigateTo('app');
+        }
+
+        // --- City Logic (User) ---
+        async function loadCities() {
+            const container = document.getElementById('city-list-container');
+            container.innerHTML = '<p>Carregando...</p>';
+            try {
+                const res = await fetch('/get_active_cities');
+                const data = await res.json();
+                container.innerHTML = '';
+
+                if (data.cities.length === 0) {
+                    container.innerHTML = '<p>Nenhuma cidade disponível.</p>';
+                } else {
+                    data.cities.forEach(city => {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn secondary large';
+                        btn.style.width = '100%';
+                        btn.style.marginBottom = '10px';
+                        btn.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${city}`;
+                        btn.onclick = () => initApp(false, city);
+                        container.appendChild(btn);
+                    });
+                }
+            } catch (e) { container.innerHTML = '<p>Erro ao carregar cidades.</p>'; }
         }
 
 
-
-        // --- Login ---
-        document.getElementById('btn-do-login').addEventListener('click', async () => {
+        // --- Auth Logic (Admin) ---
+        document.getElementById('btn-do-login').onclick = async () => {
             const email = document.getElementById('admin-email').value;
             const password = document.getElementById('admin-password').value;
             try {
                 const res = await fetch('/login', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({email, password})
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showApp(true);
+                    initApp(true, data.city);
                 } else alert(data.error);
-            } catch (e) { alert(e); }
-        });
+            } catch (e) { alert("Erro de conexão"); }
+        };
 
-        document.getElementById('btn-logout').addEventListener('click', async () => {
-            await fetch('/logout', {method: 'POST'});
-            location.reload();
-        });
+        // Create User
+        document.getElementById('btn-create-user').onclick = async () => {
+            const email = document.getElementById('new-user-email').value;
+            const password = document.getElementById('new-user-pass').value;
+            const city = document.getElementById('new-user-city').value;
 
-        if(document.getElementById('btn-admin-back')) {
-            document.getElementById('btn-admin-back').addEventListener('click', async () => {
-                 await fetch('/logout', {method: 'POST'});
-                 // Instead of reload, maybe just go back to role screen? 
-                 // But security wise, logout is better.
-                 location.reload();
-            });
-        }
+            if (!email || !password || !city) return alert("Preencha todos os campos");
 
-        // --- Admin: Masters ---
-        async function loadAdminMasters() {
-            const listFn = async () => {
-                const res = await fetch('/list_masters');
-                const data = await res.json();
-                const container = document.getElementById('admin-file-list');
-                container.innerHTML = '';
-                if(data.masters.length === 0) container.innerHTML = '<p>Nenhuma planilha carregada.</p>';
-                data.masters.forEach(f => {
-                    const div = document.createElement('div');
-                    div.className = 'file-list-item';
-                    div.innerHTML = `
-                        <span><i class="fas fa-file-excel"></i> ${f}</span> 
-                        <div>
-                            <a href="/get_master/${f}" class="btn secondary" style="width:auto; padding:5px 10px; display:inline-block; margin-right:5px; font-size: 0.8rem;"><i class="fas fa-download"></i></a>
-                            <button class="btn danger" style="width:auto; padding:5px 10px;" onclick="deleteMaster('${f}')"><i class="fas fa-trash"></i></button>
-                        </div>`;
-                    container.appendChild(div);
+            try {
+                const res = await fetch('/create_user', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, city })
                 });
-            };
-            listFn();
+                const data = await res.json();
+                if (res.ok) {
+                    alert('Usuário criado!');
+                    document.getElementById('new-user-email').value = '';
+                    document.getElementById('new-user-pass').value = '';
+                    document.getElementById('new-user-city').value = '';
+                    // Maybe refresh active apps/cities?
+                } else {
+                    alert(data.error);
+                }
+            } catch (e) { alert("Erro ao criar usuário: " + e); }
+        };
+
+
+        // --- Feature: Masters (Admin) ---
+        async function loadAdminMasters() {
+            const container = document.getElementById('admin-file-list');
+            container.innerHTML = 'Carregando...';
+            const res = await fetch('/list_masters'); // Admin: Backend uses session city
+            const data = await res.json();
+
+            container.innerHTML = '';
+            if (data.masters.length === 0) container.innerHTML = '<p>Nenhuma planilha para sua cidade.</p>';
+            data.masters.forEach(f => {
+                const div = document.createElement('div');
+                div.className = 'file-list-item';
+                div.innerHTML = `
+                    <span><i class="fas fa-file-excel"></i> ${f}</span> 
+                    <div>
+                        <a href="/get_master/${f}" class="btn secondary" style="width:auto; padding:5px 10px; display:inline-block; margin-right:5px; font-size: 0.8rem;"><i class="fas fa-download"></i></a>
+                        <button class="btn danger" style="width:auto; padding:5px 10px;" onclick="deleteMaster('${f}')"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                container.appendChild(div);
+            });
         }
 
         window.deleteMaster = async (filename) => {
-            if(!confirm(`Remover "${filename}"?`)) return;
+            if (!confirm(`Remover "${filename}"?`)) return;
             const res = await fetch('/delete_master', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({filename})
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename })
             });
-            if(res.ok) loadAdminMasters();
-            else alert('Erro ao remover');
+            if (res.ok) loadAdminMasters();
+            else {
+                const err = await res.json();
+                alert(err.error || 'Erro ao remover');
+            }
         };
 
         // Upload
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const btnUpload = document.getElementById('btn-upload');
-        
+
         dropZone.onclick = () => fileInput.click();
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = '#000'; };
+        dropZone.ondragleave = (e) => { e.preventDefault(); dropZone.style.borderColor = '#ccc'; };
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#ccc';
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                fileInput.onchange();
+            }
+        };
+
         fileInput.onchange = () => {
-            if(fileInput.files.length) {
+            if (fileInput.files.length) {
                 document.getElementById('file-name').textContent = `${fileInput.files.length} arquivo(s) selecionado(s)`;
                 document.getElementById('file-name').classList.remove('hidden');
                 btnUpload.disabled = false;
@@ -400,7 +541,7 @@
             for (const file of fileInput.files) {
                 const fd = new FormData();
                 fd.append('file', file);
-                await fetch('/upload_master', {method: 'POST', body: fd});
+                await fetch('/upload_master', { method: 'POST', body: fd });
             }
             showLoading(false);
             alert('Concluído!');
@@ -410,15 +551,15 @@
             document.getElementById('file-name').classList.add('hidden');
         };
 
-        // --- Admin: Reports ---
+        // --- Feature: Reports (Admin) ---
         async function loadReports() {
             const list = document.getElementById('reports-list');
             list.innerHTML = '<li>Carregando...</li>';
             const res = await fetch('/list_reports');
             const data = await res.json();
             list.innerHTML = '';
-            if(!data.reports || !data.reports.length) {
-                list.innerHTML = '<li>Nenhum relatório.</li>'; 
+            if (!data.reports || !data.reports.length) {
+                list.innerHTML = '<li>Nenhum relatório.</li>';
                 return;
             }
             data.reports.forEach(r => {
@@ -433,26 +574,27 @@
             });
         }
         document.getElementById('btn-refresh-reports').onclick = loadReports;
-        
+
         window.deleteReport = async (filename) => {
-            if(!confirm(`Excluir relatório "${filename}"?`)) return;
-             const res = await fetch('/delete_report', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({filename})
+            if (!confirm(`Excluir relatório "${filename}"?`)) return;
+            const res = await fetch('/delete_report', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename })
             });
-            if(res.ok) loadReports();
+            if (res.ok) loadReports();
             else alert('Erro ao excluir');
         }
 
-        // --- User: Workflow ---
+        // --- Feature: User Audit ---
         async function loadUserMasters() {
             const container = document.getElementById('user-file-list');
             container.innerHTML = 'Carregando...';
-            const res = await fetch('/list_masters');
+            // Pass city to backend to filter
+            const res = await fetch(`/list_masters?city=${encodeURIComponent(currentUserCity)}`);
             const data = await res.json();
             container.innerHTML = '';
-            if(!data.masters.length) {
-                container.innerHTML = '<p>Nenhuma planilha disponível (Contate o admin).</p>';
+            if (!data.masters.length) {
+                container.innerHTML = `<p>Nenhuma planilha para <b>${currentUserCity}</b>.</p>`;
                 return;
             }
             data.masters.forEach(f => {
@@ -464,102 +606,116 @@
         }
 
         document.getElementById('btn-load-rooms').onclick = async () => {
-             const selected = Array.from(document.querySelectorAll('input[name="master_file"]:checked')).map(cb => cb.value);
-             if(!selected.length) { alert('Selecione pelo menos uma planilha.'); return; }
-             
-             showLoading(true, "Carregando salas...");
-             try {
-                 const res = await fetch('/get_rooms', {
-                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                     body: JSON.stringify({filenames: selected})
-                 });
-                 const data = await res.json();
-                 
-                 const select = document.getElementById('room-select');
-                 select.innerHTML = '<option value="" selected disabled>Selecione uma sala...</option>';
-                 
-                 // Group by source file
-                 const grouped = {};
-                 data.rooms.forEach(r => {
-                     if(!grouped[r.source]) grouped[r.source] = [];
-                     grouped[r.source].push(r);
-                 });
-                 
-                 for (const [source, rooms] of Object.entries(grouped)) {
-                     const optgroup = document.createElement('optgroup');
-                     optgroup.label = source;
-                     rooms.forEach(r => {
-                         const opt = document.createElement('option');
-                         opt.value = r.id; // Sheet Name
-                         opt.textContent = r.name;
-                         opt.dataset.source = r.source; // Store source file
-                         optgroup.appendChild(opt);
-                     });
-                     select.appendChild(optgroup);
-                 }
-                 
-                 select.disabled = false;
-                 document.getElementById('user-audit-step').classList.remove('disabled');
-                 document.getElementById('user-audit-step').scrollIntoView({behavior: 'smooth'});
-                 
-             } catch(e) { alert('Erro ao carregar salas: ' + e); }
-             finally { showLoading(false); }
+            const selected = Array.from(document.querySelectorAll('input[name="master_file"]:checked')).map(cb => cb.value);
+            if (!selected.length) { alert('Selecione pelo menos uma planilha.'); return; }
+
+            showLoading(true, "Carregando salas...");
+            try {
+                const res = await fetch('/get_rooms', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filenames: selected })
+                });
+                const data = await res.json();
+
+                const select = document.getElementById('room-select');
+                select.innerHTML = '<option value="" selected disabled>Selecione uma sala...</option>';
+
+                // Group by source file
+                const grouped = {};
+                data.rooms.forEach(r => {
+                    if (!grouped[r.source]) grouped[r.source] = [];
+                    grouped[r.source].push(r);
+                });
+
+                for (const [source, rooms] of Object.entries(grouped)) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = source;
+                    rooms.forEach(r => {
+                        const opt = document.createElement('option');
+                        opt.value = r.id; // Sheet Name
+                        opt.textContent = r.name;
+                        opt.dataset.source = r.source; // Store source file
+                        optgroup.appendChild(opt);
+                    });
+                    select.appendChild(optgroup);
+                }
+
+                select.disabled = false;
+                document.getElementById('user-audit-step').classList.remove('disabled');
+                document.getElementById('user-audit-step').scrollIntoView({ behavior: 'smooth' });
+
+            } catch (e) { alert('Erro ao carregar salas: ' + e); }
+            finally { showLoading(false); }
         };
 
         document.getElementById('btn-verify').onclick = async () => {
-             const analyst = document.getElementById('analyst-name').value;
-             const select = document.getElementById('room-select');
-             const roomName = select.value;
-             const codes = document.getElementById('scanned-codes').value;
-             
-             if(!analyst || !roomName || !codes) { alert('Preencha todos os campos'); return; }
-             
-             const sourceFile = select.options[select.selectedIndex].dataset.source;
-             const selectedFiles = Array.from(document.querySelectorAll('input[name="master_file"]:checked')).map(cb => cb.value);
+            const analyst = document.getElementById('analyst-name').value;
+            const select = document.getElementById('room-select');
+            const roomName = select.value;
+            const codes = document.getElementById('scanned-codes').value;
 
-             showLoading(true, "Processando auditoria com referência cruzada...");
-             
-             try {
-                 const res = await fetch('/verify', {
-                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                     body: JSON.stringify({
-                         analyst_name: analyst,
-                         room_name: roomName,
-                         source_file: sourceFile,
-                         selected_files: selectedFiles,
-                         scanned_codes: codes
-                     })
-                 });
-                 
-                 if(res.ok) {
-                     const data = await res.json();
-                     if(data.success) {
-                         alert('Auditoria concluída com sucesso!');
-                         
-                         // Open Drive Link
-                         if(data.drive_link) {
-                             window.open(data.drive_link, '_blank');
-                         }
-                         
-                         // Download ZIP as backup
-                         if(data.download_url) {
-                             const a = document.createElement('a');
-                             a.href = data.download_url;
-                             a.download = `${analyst}_Resultados.zip`; 
-                             document.body.appendChild(a);
-                             a.click();
-                             a.remove();
-                         }
-                     } else {
-                         alert('Erro: ' + data.error);
-                     }
-                 } else {
-                     const err = await res.json();
-                     alert('Erro: ' + err.error);
-                 }
-             } catch(e) { alert('Erro fatal: ' + e); }
-             finally { showLoading(false); }
+            if (!analyst || !roomName || !codes) { alert('Preencha todos os campos'); return; }
+
+            const sourceFile = select.options[select.selectedIndex].dataset.source;
+            const selectedFiles = Array.from(document.querySelectorAll('input[name="master_file"]:checked')).map(cb => cb.value);
+
+            showLoading(true, "Processando auditoria com referência cruzada...");
+
+            try {
+                const res = await fetch('/verify', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        analyst_name: analyst,
+                        room_name: roomName,
+                        source_file: sourceFile,
+                        selected_files: selectedFiles,
+                        scanned_codes: codes
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        alert('Auditoria concluída com sucesso!');
+
+                        // Open Drive Link
+                        if (data.drive_link) {
+                            window.open(data.drive_link, '_blank');
+                        }
+
+                        // Download ZIP as backup
+                        if (data.download_url) {
+                            const a = document.createElement('a');
+                            a.href = data.download_url;
+                            a.download = `${analyst}_Resultados.zip`;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                        }
+                    } else {
+                        alert('Erro: ' + data.error);
+                    }
+                } else {
+                    const err = await res.json();
+                    alert('Erro: ' + err.error);
+                }
+            } catch (e) { alert('Erro fatal: ' + e); }
+            finally { showLoading(false); }
         };
-    </script>
+
+        // --- Check Session on Load ---
+        (async () => {
+            // Check if already logged in (Admin)
+            try {
+                const res = await fetch('/check_auth');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.is_admin) {
+                        initApp(true, data.city);
+                    }
+                }
+            } catch (e) { }
+        })();    </script>
 </body>
+
 </html>
