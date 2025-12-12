@@ -1,5 +1,6 @@
 :root {
-    --primary-color: #C62828; /* SESI Red */
+    --primary-color: #C62828;
+    /* SESI Red */
     --primary-dark: #8E0000;
     --background: #f4f6f8;
     --card-bg: #ffffff;
@@ -120,7 +121,8 @@ header p {
     transition: border-color 0.3s;
 }
 
-.upload-area:hover, .upload-area.dragover {
+.upload-area:hover,
+.upload-area.dragover {
     border-color: var(--primary-color);
     background: #fff5f5;
 }
@@ -152,7 +154,11 @@ label {
     color: var(--text-main);
 }
 
-input[type="text"], input[type="password"], select, textarea {
+input[type="text"],
+input[type="password"],
+input[type="email"],
+select,
+textarea {
     width: 100%;
     padding: 12px;
     border: 1px solid var(--border-color);
@@ -162,7 +168,11 @@ input[type="text"], input[type="password"], select, textarea {
     transition: border-color 0.3s;
 }
 
-input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+select:focus,
+textarea:focus {
     outline: none;
     border-color: var(--primary-color);
 }
@@ -220,7 +230,7 @@ textarea {
 
 .btn:not(:disabled):hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .hidden {
@@ -252,8 +262,13 @@ textarea {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Landing Page Styles */
@@ -276,7 +291,8 @@ textarea {
     text-align: center;
     max-width: 1000px;
     padding: 40px;
-    margin-bottom: 10vh; /* Move slightly above center */
+    margin-bottom: 10vh;
+    /* Move slightly above center */
     display: flex;
     flex-direction: column;
     gap: 15px;
@@ -361,7 +377,7 @@ textarea {
     border-radius: var(--radius);
     width: 90%;
     max-width: 400px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     position: relative;
     text-align: center;
 }
@@ -386,8 +402,15 @@ textarea {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 footer {
@@ -430,9 +453,20 @@ footer {
 
 /* Animation for Start Button */
 @keyframes pulse {
-    0% { transform: scale(1); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    50% { transform: scale(1.05); box-shadow: 0 6px 12px rgba(229, 9, 20, 0.4); }
-    100% { transform: scale(1); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    0% {
+        transform: scale(1);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 12px rgba(229, 9, 20, 0.4);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
 }
 
 .pulse-animation {
@@ -465,7 +499,8 @@ footer {
     height: auto;
     margin-bottom: 20px;
     align-self: center;
-    margin-top: 40px; /* Added top margin */
+    margin-top: 40px;
+    /* Added top margin */
 }
 
 /* Responsiveness */
@@ -480,10 +515,12 @@ footer {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* Helper, but can prevent scroll if not handled */
+    justify-content: center;
+    /* Helper, but can prevent scroll if not handled */
     z-index: 2000;
     transition: opacity 0.5s ease;
-    overflow-y: auto; /* Allow Scroll! */
+    overflow-y: auto;
+    /* Allow Scroll! */
 }
 
 /* Ensure content is center but scrolls if too tall */
@@ -492,17 +529,20 @@ footer {
     max-width: 1000px;
     width: 100%;
     padding: 40px 20px;
-    margin: auto; /* Centers vertically if flex parent allows, or top if scrolls */
+    margin: auto;
+    /* Centers vertically if flex parent allows, or top if scrolls */
     display: flex;
     flex-direction: column;
     gap: 15px;
-    min-height: min-content; /* Ensure it takes height */
+    min-height: min-content;
+    /* Ensure it takes height */
 }
 
 /* Form Grid System */
 .form-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* 2 cols */
+    grid-template-columns: 1fr 1fr;
+    /* 2 cols */
     gap: 20px;
     width: 100%;
     max-width: 600px;
@@ -511,7 +551,8 @@ footer {
 }
 
 .form-full {
-    grid-column: 1 / -1; /* Span all cols */
+    grid-column: 1 / -1;
+    /* Span all cols */
     width: 100%;
     max-width: 600px;
     margin: 0 auto;
@@ -523,11 +564,13 @@ footer {
     .container {
         padding: 20px 15px;
     }
-    
+
     .landing-content {
-        padding: 40px 20px; /* More padding top/bottom to avoid cutting edge */
+        padding: 40px 20px;
+        /* More padding top/bottom to avoid cutting edge */
         margin: 0 auto;
-        justify-content: flex-start; /* Start from top on mobile */
+        justify-content: flex-start;
+        /* Start from top on mobile */
     }
 
     .landing-logo {
@@ -538,31 +581,32 @@ footer {
     h1 {
         font-size: 1.8rem;
     }
-    
+
     .btn.large {
         width: 100%;
         max-width: 100%;
     }
-    
+
     .developers {
         gap: 20px;
     }
-    
+
     .role-group {
-        flex: 1 1 100%; /* Stack on mobile */
+        flex: 1 1 100%;
+        /* Stack on mobile */
     }
-    
+
     .card-header {
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .file-list-item {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
     }
-    
+
     .file-list-item div {
         align-self: flex-end;
     }
