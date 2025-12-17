@@ -11,7 +11,7 @@ from copy import copy
 import unicodedata
 import re
 
-app = Flask(__name__, static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static'))
+app = Flask(__name__)
 app.secret_key = 'super_secret_key_sesi_sorocaba' # Change this in production!
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 

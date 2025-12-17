@@ -1,0 +1,56 @@
+GUIA RÁPIDO - SISTEMA DE AUDITORIA PATRIMONIAL (SESI SOROCABA)
+================================================================
+
+Este sistema permite que Administradores gerenciem redes de auditoria e que Auditores realizem a conferência física dos bens.
+
+=== PERFIL 1: ADMINISTRADOR (Gestor do Patrimônio) ===
+
+1. ACESSO INICIAL
+   - Abra o sistema e clique em "Acesso Administrativo".
+   - Se for seu primeiro acesso, clique em "Criar Nova Rede (Conta)".
+   - Preencha seus dados de Login e crie sua primeira Rede (com senha própria para os auditores).
+
+2. GERENCIAMENTO DE REDES
+   - No painel, você verá a seção "Minhas Redes".
+   - Você pode criar múltiplas redes (ex: "Filial A", "Filial B") para separar as auditorias.
+   - Cada rede tem uma SENHA ÚNICA. Entregue essa senha aos auditores que trabalharão naquela unidade.
+
+3. PREPARAÇÃO (UPLOAD DE PLANILHAS)
+   - Na seção "Gerenciar Planilhas Mãe", envie os arquivos Excel (.xlsx) contendo a base de dados dos bens.
+   - Arraste o arquivo para a área pontilhada e clique em "Enviar Planilha".
+   - Essas planilhas ficarão disponíveis para todos os auditores que entrarem nas suas redes.
+
+4. ACOMPANHAMENTO
+   - Na seção "Relatórios Gerados", você verá os arquivos de auditoria enviados pelos auditores.
+   - Clique no ícone de download para baixar os resultados (Verificados, Não Encontrados, Local Incorreto).
+
+---
+
+=== PERFIL 2: AUDITOR (Quem confere os bens) ===
+
+1. ENTRANDO NA REDE
+   - Na tela inicial, clique em "Área do Usuário".
+   - Selecione a Cidade.
+   - Escolha a Rede correta na lista.
+   - Digite a SENHA DA REDE (fornecida pelo Administrador).
+
+2. REALIZANDO A AUDITORIA
+   - PASSO 1: Selecione as planilhas de referência na lista (marque as caixas).
+   - Clique em "Carregar Salas".
+   
+   - PASSO 2: Preencha seus dados:
+     * Nome do Analista: Seu nome.
+     * Sala em Análise: Escolha a sala que você está conferindo agora.
+     * Códigos Bipados: Clique na caixa de texto e bipe (ou digite) os códigos de barras dos bens físicos.
+   
+   - PASSO 3: Clique em "Verificar e Gerar Relatório".
+   
+3. RESULTADO
+   - O sistema irá processar e baixar automaticamente um arquivo ZIP.
+   - Este arquivo contém 3 planilhas:
+     * Verificados (O que estava correto).
+     * Não Encontrados (O que faltou na sala).
+     * Local Incorreto (Itens de outras salas encontrados ali).
+
+================================================================
+DÚVIDAS? Contate o Administrador do Sistema.
