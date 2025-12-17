@@ -290,8 +290,23 @@
                     <div style="clear:both;"></div>
                 </div>
 
-                <!-- Admin: User Management (Previously User Mgmt, now Info) -->
-                <!-- Ideally show Network Info or Password Reset? For now simplest -->
+                <!-- Super Admin Panel -->
+                <section class="card hidden" id="super-admin-panel" style="border: 2px solid #ff4444;">
+                    <div class="card-header" style="background: #ffe6e6;">
+                        <div class="header-title">
+                            <div class="step-number" style="background:#ff4444;"><i class="fas fa-user-shield"></i>
+                            </div>
+                            <h2 style="color:#cc0000;">Painel Super Admin</h2>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="description">Gestão Global de Usuários e Redes.</p>
+                        <button onclick="loadAllUsers()" class="btn secondary" style="width:auto; margin-bottom:10px;">
+                            <i class="fas fa-sync"></i> Atualizar Lista
+                        </button>
+                        <div id="super-admin-users-list"></div>
+                    </div>
+                </section>
                 <!-- Admin: Network Management -->
                 <section class="card" id="admin-network-mgmt">
                     <div class="card-header">
@@ -379,6 +394,7 @@
         // --- Global State ---
         let currentUserCity = null;
         let currentNetworkName = null;
+        let isSuperAdmin = false;
         const loadingOverlay = document.getElementById('loading-overlay');
 
         // --- Screens ---
@@ -481,7 +497,15 @@
                 document.getElementById('user-section').classList.add('hidden');
                 document.getElementById('header-actions').classList.remove('hidden');
                 document.getElementById('admin-network-mgmt').classList.remove('hidden');
-                // document.getElementById('admin-network-name-display').textContent = networkName || "Global";
+
+                // Super Admin Logic
+                if (isSuperAdmin) {
+                    document.getElementById('super-admin-panel').classList.remove('hidden');
+                    loadAllUsers();
+                } else {
+                    document.getElementById('super-admin-panel').classList.add('hidden');
+                }
+
                 loadAdminMasters();
                 loadReports();
                 loadMyNetworks();
@@ -668,6 +692,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
+                    isSuperAdmin = data.is_super_admin || false;
                     initApp(true, data.city, data.network_name);
                 } else alert(data.error);
             } catch (e) { alert("Erro de conexão"); }
@@ -936,6 +961,7 @@
                     const data = await res.json();
                     // If Admin
                     if (data.is_admin) {
+                        isSuperAdmin = data.is_super_admin || false;
                         initApp(true, data.city, data.network_name);
                     }
                     // If Public User Connected to Network
@@ -948,6 +974,65 @@
 
         // Start
         checkSessionAndInit();
+
+        // --- Super Admin Functions ---
+        async function loadAllUsers() {
+            const container = document.getElementById('super-admin-users-list');
+            container.innerHTML = 'Carregando usuários...';
+            try {
+                const res = await fetch('/admin/users');
+                const data = await res.json();
+                container.innerHTML = '';
+
+                if (!data.users || !data.users.length) {
+                    container.innerHTML = 'Nenhum usuário encontrado.';
+                    return;
+                }
+
+                // Table structure
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                table.style.borderCollapse = 'collapse';
+                table.innerHTML = `
+                    <tr style="background:#eee; text-align:left;">
+                        <th style="padding:8px;">Email</th>
+                        <th style="padding:8px;">Cidade</th>
+                        <th style="padding:8px;">Ações</th>
+                    </tr>
+                `;
+
+                data.users.forEach(u => {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid #ddd';
+                    row.innerHTML = `
+                        <td style="padding:8px;">${u.email} ${u.is_admin ? '<span style="font-size:0.8em; background:#ddd; padding:2px 5px; border-radius:4px;">Admin</span>' : ''}</td>
+                        <td style="padding:8px;">${u.city}</td>
+                        <td style="padding:8px;">
+                            ${u.email === 'admin@123' ? '' : `<button onclick="deleteUser('${u.id}')" class="btn danger" style="padding:4px 10px; width:auto; font-size:0.8rem;">Excluir</button>`}
+                        </td>
+                    `;
+                    table.appendChild(row);
+                });
+                container.appendChild(table);
+
+            } catch (e) {
+                container.innerHTML = 'Erro ao carregar usuários: ' + e;
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('ATENÇÃO: Isso excluirá o usuário, todas as suas redes, planilhas e relatórios. Tem certeza?')) return;
+            try {
+                const res = await fetch(`/admin/users/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    alert('Usuário excluído.');
+                    loadAllUsers();
+                } else {
+                    const d = await res.json();
+                    alert('Erro: ' + d.error);
+                }
+            } catch (e) { alert('Erro: ' + e); }
+        }
     </script>
 </body>
 
