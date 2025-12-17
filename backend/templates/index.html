@@ -342,7 +342,9 @@
                     <div class="card-header">
                         <div class="header-title">
                             <div class="step-number">1</div>
-                            <h2>Gerenciar Planilhas Mãe</h2>
+                            <h2>Gerenciar Planilhas Mãe <span id="mgmt-status" class="hidden"
+                                    style="font-size:0.6em; color:#fff; background:#2c3e50; padding:2px 5px; border-radius:4px;"></span>
+                            </h2>
                         </div>
                     </div>
                     <div class="card-body">
@@ -395,6 +397,7 @@
         let currentUserCity = null;
         let currentNetworkName = null;
         let isSuperAdmin = false;
+        let currentNetworkId = null; // New: Network Context
         const loadingOverlay = document.getElementById('loading-overlay');
 
         // --- Screens ---
@@ -489,6 +492,7 @@
         function initApp(isAdmin, city, networkName) {
             currentUserCity = city;
             currentNetworkName = networkName;
+            currentNetworkId = null; // Reset on init
             document.getElementById('header-city-name').textContent = city || "Indefinido";
             document.getElementById('header-network').textContent = networkName ? `| ${networkName}` : "";
 
@@ -540,7 +544,10 @@
                     div.style.alignItems = 'center';
                     div.innerHTML = `
                         <span><i class="fas fa-network-wired"></i> ${net.name}</span>
-                        <button class="btn danger" style="padding: 2px 8px; font-size: 0.8rem; width:auto;" onclick="deleteNetwork('${net.id}')">Excluir</button>
+                        <div>
+                            <button class="btn secondary" style="padding: 2px 8px; font-size: 0.8rem; width:auto; margin-right:5px;" onclick="manageNetwork('${net.id}', '${net.name}')">Gerenciar</button>
+                            <button class="btn danger" style="padding: 2px 8px; font-size: 0.8rem; width:auto;" onclick="deleteNetwork('${net.id}')">Excluir</button>
+                        </div>
                     `;
                     container.appendChild(div);
                 });
@@ -582,6 +589,15 @@
                 if (res.ok) loadMyNetworks();
                 else alert('Erro ao excluir');
             } catch (e) { alert('Erro: ' + e); }
+        };
+
+        window.manageNetwork = (id, name) => {
+            currentNetworkId = id;
+            document.getElementById('mgmt-status').textContent = `(Gerenciando: ${name})`;
+            document.getElementById('mgmt-status').classList.remove('hidden');
+            loadAdminMasters();
+            // Scroll to files
+            document.getElementById('admin-file-handling').scrollIntoView({ behavior: 'smooth' });
         };
 
         // --- City Logic (User) ---
@@ -730,7 +746,9 @@
         async function loadAdminMasters() {
             const container = document.getElementById('admin-file-list');
             container.innerHTML = 'Carregando...';
-            const res = await fetch('/list_masters'); // Admin: Backend uses session city
+
+            const url = currentNetworkId ? `/list_masters?network_id=${currentNetworkId}` : '/list_masters';
+            const res = await fetch(url);
             const data = await res.json();
 
             container.innerHTML = '';
@@ -791,6 +809,7 @@
             for (const file of fileInput.files) {
                 const fd = new FormData();
                 fd.append('file', file);
+                if (currentNetworkId) fd.append('network_id', currentNetworkId);
                 await fetch('/upload_master', { method: 'POST', body: fd });
             }
             showLoading(false);
