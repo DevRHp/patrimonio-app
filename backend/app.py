@@ -276,7 +276,7 @@ def upload_master():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    if file and file.filename.endswith('.xlsx'):
+    if file and file.filename.lower().endswith('.xlsx'):
         filename = file.filename
         
         # Save to Disk
