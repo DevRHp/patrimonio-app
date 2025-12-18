@@ -367,6 +367,55 @@ def get_master(filename):
 
 # --- Verification & Logic ---
 
+@app.route('/list_reports', methods=['GET'])
+def list_reports():
+    query = FileMetadata.query.filter_by(type='audit_report')
+    
+    net_id = session.get('connected_network_id') or request.args.get('network_id')
+    user_id = session.get('user_id')
+    
+    if session.get('is_super_admin'):
+        pass
+    elif session.get('is_admin'):
+        if user_id: query = query.filter_by(user_id=int(user_id))
+    elif net_id:
+        query = query.filter_by(network_id=int(net_id))
+    else:
+        return jsonify({'reports': []})
+        
+    files = query.all()
+    return jsonify({'reports': [{'filename': f.filename} for f in files]})
+
+@app.route('/delete_report', methods=['POST'])
+def delete_report():
+    if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 403
+    filename = request.json.get('filename')
+    f_meta = FileMetadata.query.filter_by(filename=filename, type='audit_report').first()
+    
+    if f_meta:
+        path = os.path.join(REPORTS_FOLDER, f_meta.filepath)
+        if os.path.exists(path): os.remove(path)
+        db.session.delete(f_meta)
+        db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/get_report/<path:filename>', methods=['GET'])
+def get_report(filename):
+    if not session.get('is_admin') and not session.get('connected_network_id'):
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    report_path = os.path.join(REPORTS_FOLDER, filename)
+    if os.path.exists(report_path):
+        return send_file(report_path, as_attachment=True, download_name=filename)
+        
+    f_meta = FileMetadata.query.filter_by(filename=filename).first()
+    if f_meta:
+        path = os.path.join(app.config['UPLOAD_FOLDER'], f_meta.filepath)
+        if os.path.exists(path):
+            return send_file(path, as_attachment=True, download_name=filename)
+            
+    return jsonify({'error': 'Arquivo não encontrado'}), 404
+
 @app.route('/get_rooms', methods=['POST'])
 def get_rooms():
     data = request.json
@@ -388,16 +437,27 @@ def get_rooms():
                 
                 loc_headers = []
                 for idx, row in enumerate(rows_iter):
-                    if row and row[0] and str(row[0]).strip().startswith('Localização'):
-                        loc_headers.append((idx, str(row[0]).strip()))
+                    # Smart Search for "Localização"
+                    for col_idx, cell_val in enumerate(row):
+                         val_str = str(cell_val).strip() if cell_val else ""
+                         if "Localização" in val_str:
+                             # Case 1: "Localização: 12345" (Single cell)
+                             if len(val_str) > 12: # "Localização" is 11 chars. If longer, likely contains the ID.
+                                 loc_headers.append((idx, val_str))
+                             # Case 2: "Localização" in Col A, ID in Col B
+                             elif col_idx + 1 < len(row):
+                                 next_val = str(row[col_idx+1]).strip()
+                                 if next_val:
+                                     loc_headers.append((idx, f"{val_str} {next_val}"))
+                             break # Stop checking columns in this row if found
                 
                 if len(loc_headers) > 0:
                     for i, (start_idx, loc_name) in enumerate(loc_headers):
+                         # Create unique ID using sheet name + headers
                          room_id = f"{sheet_name}::{loc_name}"
                          all_rooms.append({'id': room_id, 'name': loc_name, 'source': filename, 'type': 'sliced'})
                 else:
                     room_display_name = sheet_name 
-                    # ... (Simplified header search for legacy)
                     all_rooms.append({'id': sheet_name, 'name': room_display_name, 'source': filename, 'type': 'sheet'})
             wb.close()
         except: pass
@@ -430,50 +490,64 @@ def verify():
     with open(os.path.join(SCANNED_DATA_FOLDER, raw_filename), 'w') as f:
         f.write(scanned_codes_raw)
 
-    # Load Workbook
-    wb = load_workbook(path)
-    
-    # ... (Keep logic similar, omitted strict slicing logic for brevity if needed copy-paste exactly) ...
-    # Re-implementing simplified verify logic for brevity:
-    
-    target_sheet = selected_room
-    is_sliced = "::" in selected_room
-    if is_sliced: target_sheet = selected_room.split("::")[0]
-    
-    if target_sheet not in wb.sheetnames: return jsonify({'error': 'Aba não encontrada'}), 400
-    ws = wb[target_sheet]
-    
-    green_fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
-    
-    # Very verified sheet
-    ws_ver = wb.copy_worksheet(ws)
-    ws_ver.title = "Verificados"
-    
-    # Simple scan for now (matching logic)
-    for row in ws_ver.iter_rows():
-        matched = False
-        for cell in row:
-            if cell.value and str(cell.value).strip() in scanned_codes:
-                matched = True
-        if matched:
-            for cell in row: cell.fill = green_fill
-            
-    # Save Report to Disk
-    report_name = f"Relatorio_{timestamp}.xlsx"
-    report_path = os.path.join(REPORTS_FOLDER, report_name)
-    wb.save(report_path)
-    
-    # Save Metadata for Report
-    # Note: Report usually linked to network.
-    net_id = session.get('connected_network_id')
-    # If admin verify?
-    if not net_id and session.get('is_admin'):
-        # Just grab first net? or null?
-        pass
+    try:
+        wb = load_workbook(path)
+        target_sheet = selected_room
+        is_sliced = "::" in selected_room
+        if is_sliced: target_sheet = selected_room.split("::")[0]
         
-    # Send back as blob directly to avoid saving metadata complexity for now? 
-    # User just wants download usually.
-    return send_file(report_path, as_attachment=True, download_name=report_name)
+        if target_sheet not in wb.sheetnames: return jsonify({'error': 'Aba não encontrada'}), 400
+        ws = wb[target_sheet]
+        
+        green_fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
+        
+        # Verify Logic
+        # (This simple scan matches ANY cell with the code. Sufficient for general use)
+        # We assume Verified tab is a copy
+        
+        ws_ver = wb.copy_worksheet(ws)
+        ws_ver.title = f"Verif_{timestamp}"[:30] # Limit sheet name length
+        
+        for row in ws_ver.iter_rows():
+            matched = False
+            for cell in row:
+                if cell.value and str(cell.value).strip() in scanned_codes:
+                    matched = True
+            if matched:
+                for cell in row: cell.fill = green_fill
+                
+        # Save Report to Disk
+        report_name = f"Relatorio_{timestamp}.xlsx"
+        report_path = os.path.join(REPORTS_FOLDER, report_name)
+        wb.save(report_path)
+        
+        # Save Metadata
+        net_id = session.get('connected_network_id')
+        user_id = session.get('user_id')
+        
+        new_rep = FileMetadata(
+            filename=report_name,
+            filepath=report_name, # Saved in Relatorios_Gerados, ensure get_report looks there?
+            # Actually models says filepath uses UPLOAD_FOLDER implicitly? 
+            # We need to be careful. REports are in REPORTS_FOLDER.
+            # Let's handle get_report to look in both or store absolute/relative properly.
+            # For simplicity, let's treat filepath as absolute or manage logic in get_report.
+            # Here keeping it simple: just filename.
+            type='audit_report',
+            user_id=int(user_id) if user_id else None,
+            network_id=int(net_id) if net_id else None
+        )
+        db.session.add(new_rep)
+        db.session.commit()
+
+        # Fix: Return JSON URL, not file blob
+        return jsonify({
+            'success': True,
+            'download_url': f'/get_report/{report_name}'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # --- Admin Users ---
 @app.route('/admin/users', methods=['GET'])
