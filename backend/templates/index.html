@@ -806,14 +806,30 @@
 
         btnUpload.onclick = async () => {
             showLoading(true, "Enviando...");
+            let errors = [];
             for (const file of fileInput.files) {
                 const fd = new FormData();
                 fd.append('file', file);
                 if (currentNetworkId) fd.append('network_id', currentNetworkId);
-                await fetch('/upload_master', { method: 'POST', body: fd });
+
+                try {
+                    const res = await fetch('/upload_master', { method: 'POST', body: fd });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        errors.push(`${file.name}: ${err.error || 'Erro desconhecido'}`);
+                    }
+                } catch (e) {
+                    errors.push(`${file.name}: Erro de rede`);
+                }
             }
             showLoading(false);
-            alert('Concluído!');
+
+            if (errors.length > 0) {
+                alert('Erros ao enviar:\n' + errors.join('\n'));
+            } else {
+                alert('Todos os arquivos foram enviados com sucesso!');
+            }
+
             loadAdminMasters();
             fileInput.value = '';
             btnUpload.disabled = true;
