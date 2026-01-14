@@ -450,32 +450,69 @@ def get_rooms():
             wb = load_workbook(path, read_only=True, data_only=True)
             for sheet_name in wb.sheetnames:
                 ws = wb[sheet_name]
-                rows_iter = list(ws.iter_rows(values_only=True))
+                rows = list(ws.iter_rows(values_only=True))
                 
-                loc_headers = []
-                for idx, row in enumerate(rows_iter):
-                    # Smart Search for "Localização"
-                    for col_idx, cell_val in enumerate(row):
-                         val_str = str(cell_val).strip() if cell_val else ""
-                         if "Localização" in val_str:
-                             # Case 1: "Localização: 12345" (Single cell)
-                             if len(val_str) > 12: # "Localização" is 11 chars. If longer, likely contains the ID.
-                                 loc_headers.append((idx, val_str))
-                             # Case 2: "Localização" in Col A, ID in Col B
-                             elif col_idx + 1 < len(row):
-                                 next_val = str(row[col_idx+1]).strip()
-                                 if next_val:
-                                     loc_headers.append((idx, f"{val_str} {next_val}"))
-                             break # Stop checking columns in this row if found
+                sheet_rooms = []
                 
-                if len(loc_headers) > 0:
-                    for i, (start_idx, loc_name) in enumerate(loc_headers):
-                         # Create unique ID using sheet name + headers
-                         room_id = f"{sheet_name}::{loc_name}"
-                         all_rooms.append({'id': room_id, 'name': loc_name, 'source': filename, 'type': 'sliced'})
+                # Scan for Header Row
+                for r_idx, row in enumerate(rows):
+                    # Check if this row looks like the specific header row
+                    # We look for "Localização" and "Denominação"
+                    row_str = [str(c).strip().lower() for c in row if c]
+                    
+                    if any("localização" in s for s in row_str):
+                        # Found a potential header row.
+                        # Now try to identify column indices
+                        loc_idx = -1
+                        denom_idx = -1
+                        inv_idx = -1
+                        
+                        for c_idx, cell in enumerate(row):
+                            val = str(cell).strip()
+                            val_lower = val.lower()
+                            
+                            if "localização" in val_lower:
+                                loc_idx = c_idx
+                            elif "denominação" in val_lower and "imobilizado" not in val_lower:
+                                # Avoid "Denominação do imobilizado" which is the items list
+                                denom_idx = c_idx
+                            elif "nº invent" in val_lower or "n° invent" in val_lower:
+                                # Grab Inventory Number if available
+                                inv_idx = c_idx
+                        
+                        # If we found at least Localização, check the NEXT row for data
+                        if loc_idx != -1 and r_idx + 1 < len(rows):
+                            data_row = rows[r_idx + 1]
+                            
+                            loc_val = str(data_row[loc_idx]).strip() if loc_idx < len(data_row) and data_row[loc_idx] else ""
+                            denom_val = str(data_row[denom_idx]).strip() if denom_idx != -1 and denom_idx < len(data_row) and data_row[denom_idx] else ""
+                            inv_val = str(data_row[inv_idx]).strip() if inv_idx != -1 and inv_idx < len(data_row) and data_row[inv_idx] else ""
+                            
+                            # Construct Display Name
+                            # Filter empty parts
+                            parts = [p for p in [loc_val, denom_val, inv_val] if p and p != "None"]
+                            if parts:
+                                full_name = " - ".join(parts)
+                                # Room ID: Use Sheet Name + Localização (or just Sheet Name if unique per sheet)
+                                # To be safe and robust:
+                                room_id = f"{sheet_name}::{full_name}"
+                                sheet_rooms.append({'id': room_id, 'name': full_name, 'source': filename, 'type': 'sliced'})
+                                
+                                # Assume only one main header per sheet for this specific format? 
+                                # Or continue scanning?
+                                # If we found a valid room line, unlikely to change format in same sheet.
+                                # But let's continue scanning just in case multiple rooms are listed (unlikely based on images).
+                                break 
+
+                if sheet_rooms:
+                    all_rooms.extend(sheet_rooms)
                 else:
-                    room_display_name = sheet_name 
-                    all_rooms.append({'id': sheet_name, 'name': room_display_name, 'source': filename, 'type': 'sheet'})
+                    # Fallback: If no headers found, do NOT add generic sheet names "Table X"
+                    # User requested to remove "Table 1, Table 2..." garbage.
+                    # Only add if it looks like a meaningful sheet? 
+                    # For now, suppressing fallback as per user request to clean up list.
+                    pass
+                    
             wb.close()
         except: pass
 
