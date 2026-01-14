@@ -105,7 +105,7 @@ def login():
         session['city'] = user.city
         
         # Super Admin Check
-        is_super = (email == 'admin@123')
+        is_super = (email == 'devprudencio@gmail.com')
         session['is_super_admin'] = is_super 
 
         return jsonify({
@@ -251,16 +251,25 @@ def join_network():
     
     network = Network.query.get(network_id)
     
-    if network and check_password_hash(network.password, password):
-        session.clear()
-        session['connected_network_id'] = network.id
-        session['connected_network_name'] = network.name
-        session['city'] = network.city
-        session['is_admin'] = False
+    # Super Admin Bypass or Password Check
+    if network:
+        # Check bypass BEFORE clearing session
+        is_super = session.get('is_super_admin')
         
-        return jsonify({'success': True, 'message': f'Conectado à rede {network.name}'})
+        if is_super or check_password_hash(network.password, password):
+            session.clear()
+            session['connected_network_id'] = network.id
+            session['connected_network_name'] = network.name
+            session['city'] = network.city
+            session['is_admin'] = False
+            # Restore Super Admin if applicable
+            if is_super: session['is_super_admin'] = True
+            
+            return jsonify({'success': True, 'message': f'Conectado à rede {network.name}'})
+        else:
+             return jsonify({'error': 'Senha da rede incorreta.'}), 401
     else:
-        return jsonify({'error': 'Senha da rede incorreta.'}), 401
+        return jsonify({'error': 'Rede não encontrada.'}), 404
 
 # --- File Management (Local FS + SQL Metadata) ---
 
@@ -375,16 +384,24 @@ def list_reports():
     user_id = session.get('user_id')
     
     if session.get('is_super_admin'):
-        pass
+        pass # See ALL
     elif session.get('is_admin'):
-        if user_id: query = query.filter_by(user_id=int(user_id))
+        # Admin sees reports from ALL networks they manage
+        if user_id:
+            my_nets = Network.query.filter_by(admin_id=int(user_id)).with_entities(Network.id).all()
+            my_net_ids = [n.id for n in my_nets]
+            if my_net_ids:
+                query = query.filter(FileMetadata.network_id.in_(my_net_ids))
+            else:
+                 query = query.filter_by(user_id=int(user_id)) # Fallback if no networks
     elif net_id:
         query = query.filter_by(network_id=int(net_id))
     else:
         return jsonify({'reports': []})
         
     files = query.all()
-    return jsonify({'reports': [{'filename': f.filename} for f in files]})
+    # Return more info for admin visibility
+    return jsonify({'reports': [{'filename': f.filename, 'network_id': f.network_id} for f in files]})
 
 @app.route('/delete_report', methods=['POST'])
 def delete_report():
