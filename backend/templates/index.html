@@ -1048,7 +1048,7 @@
                         <td style="padding:8px;">${u.email} ${u.is_admin ? '<span style="font-size:0.8em; background:#ddd; padding:2px 5px; border-radius:4px;">Admin</span>' : ''}</td>
                         <td style="padding:8px;">${u.city}</td>
                         <td style="padding:8px;">
-                            ${u.email === 'devprudencio@gmail.com' ? '' : `<button onclick="deleteUser('${u.id}')" class="btn danger" style="padding:4px 10px; width:auto; font-size:0.8rem;">Excluir</button>`}
+                            ${u.email === 'admin@123' ? '' : `<button onclick="deleteUser('${u.id}')" class="btn danger" style="padding:4px 10px; width:auto; font-size:0.8rem;">Excluir</button>`}
                         </td>
                     `;
                     table.appendChild(row);

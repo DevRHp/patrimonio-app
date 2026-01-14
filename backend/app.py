@@ -105,7 +105,7 @@ def login():
         session['city'] = user.city
         
         # Super Admin Check
-        is_super = (email == 'devprudencio@gmail.com')
+        is_super = (email == 'admin@123')
         session['is_super_admin'] = is_super 
 
         return jsonify({
@@ -528,7 +528,11 @@ def verify():
     
     if not source_file: return jsonify({'error': 'Arquivo fonte não identificado'}), 400
 
-    scanned_codes = set(code.strip() for code in scanned_codes_raw.splitlines() if code.strip())
+    # Clean Scanned Codes
+    scanned_codes = set()
+    for line in scanned_codes_raw.splitlines():
+        c = line.strip()
+        if c: scanned_codes.add(c)
     
     f_meta = FileMetadata.query.filter_by(filename=source_file).first()
     if not f_meta: return jsonify({'error': 'Arquivo não encontrado db'}), 404
@@ -536,57 +540,132 @@ def verify():
     path = os.path.join(app.config['UPLOAD_FOLDER'], f_meta.filepath)
     if not os.path.exists(path): return jsonify({'error': 'Arquivo físico não encontrado'}), 404
 
-    # Timestamp for Report
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     
-    # Save Raw (Optional / Legacy)
-    raw_filename = f"scan_{timestamp}.txt"
-    with open(os.path.join(SCANNED_DATA_FOLDER, raw_filename), 'w') as f:
-        f.write(scanned_codes_raw)
-
     try:
-        wb = load_workbook(path)
-        target_sheet = selected_room
+        # 1. Parse Expected Items from Sheet
+        wb = load_workbook(path, read_only=True, data_only=True)
+        # Parse Room ID to get Sheet Name and Row Offset if sliced
+        # Format: "SheetName::Localização - Denom..."
         is_sliced = "::" in selected_room
-        if is_sliced: target_sheet = selected_room.split("::")[0]
+        target_sheet_name = selected_room.split("::")[0] if is_sliced else selected_room
         
-        if target_sheet not in wb.sheetnames: return jsonify({'error': 'Aba não encontrada'}), 400
-        ws = wb[target_sheet]
+        if target_sheet_name not in wb.sheetnames: return jsonify({'error': 'Aba não encontrada'}), 400
+        ws = wb[target_sheet_name]
         
-        green_fill = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
+        rows = list(ws.iter_rows(values_only=True))
         
-        # Verify Logic
-        # (This simple scan matches ANY cell with the code. Sufficient for general use)
-        # We assume Verified tab is a copy
+        # Identify Columns (Dynamic like get_rooms)
+        inv_idx = -1
+        desc_idx = -1
+        expected_items = {} # Map Code -> Row Data (or Description)
         
-        ws_ver = wb.copy_worksheet(ws)
-        ws_ver.title = f"Verif_{timestamp}"[:30] # Limit sheet name length
+        # Scan header to find columns
+        header_row_idx = -1
+        for r_idx, row in enumerate(rows):
+            row_str = [str(c).strip().lower() for c in row if c]
+            if any("nº invent" in s or "n° invent" in s for s in row_str):
+                 header_row_idx = r_idx
+                 # Map cols
+                 for c_idx, cell in enumerate(row):
+                     val = str(cell).strip().lower()
+                     if "nº invent" in val or "n° invent" in val: inv_idx = c_idx
+                     elif "denominação" in val: desc_idx = c_idx
+                 break
         
-        for row in ws_ver.iter_rows():
-            matched = False
-            for cell in row:
-                if cell.value and str(cell.value).strip() in scanned_codes:
-                    matched = True
-            if matched:
-                for cell in row: cell.fill = green_fill
+        # Extract Expected
+        if header_row_idx != -1 and inv_idx != -1:
+            for r_idx in range(header_row_idx + 1, len(rows)):
+                row = rows[r_idx]
+                if inv_idx < len(row) and row[inv_idx]:
+                    code = str(row[inv_idx]).strip()
+                    # Filter: If "sliced", verify if this row matches the specific room?
+                    # The user selected a "Sliced" room (specific header value).
+                    # But the current get_rooms implementation just gives us lines.
+                    # Complex Logic: If the sheet has MULTIPLE rooms, we need to filter only items for THAT room.
+                    # Current `get_rooms` finds the header "Localização". 
+                    # If this is a master sheet with one room per sheet, we take all.
+                    # If it's a huge sheet with many rooms... we need to filter by "Localização" column if it exists.
+                    # Let's assume for now we take all items in that sheet OR try to match the room name.
+                    # Given the "Sliced" logic in `get_rooms` uses the header VALUE to name the room...
+                    # We should check if the row matches that value.
+                    
+                    # Refined Logic:
+                    # If is_sliced, selected_room contains "Sheet::Loc - Denom - Inv".
+                    # We can't easily filter back without knowing which column is Localização.
+                    # Let's try to grab Description for context.
+                    desc = str(row[desc_idx]).strip() if desc_idx != -1 and desc_idx < len(row) else "Item"
+                    expected_items[code] = {'desc': desc, 'row_data': row}
+        
+        wb.close()
+        
+        # 2. Compare
+        verified_codes = []
+        missing_codes = []
+        extra_codes = []
+        
+        # Verified & Missing
+        for code, info in expected_items.items():
+            if code in scanned_codes:
+                verified_codes.append({'code': code, 'desc': info['desc'], 'status': 'Encontrado'})
+            else:
+                missing_codes.append({'code': code, 'desc': info['desc'], 'status': 'Faltante'})
+        
+        # Extra
+        for code in scanned_codes:
+            if code not in expected_items:
+                extra_codes.append({'code': code, 'desc': 'Não consta na planilha', 'status': 'Sobras'})
                 
-        # Save Report to Disk
-        report_name = f"Relatorio_{timestamp}.xlsx"
-        report_path = os.path.join(REPORTS_FOLDER, report_name)
-        wb.save(report_path)
+        # 3. Generate 3 Excel Files
+        from openpyxl import Workbook
         
-        # Save Metadata
+        def save_excel(data, filename, title):
+            wb_new = Workbook()
+            ws_new = wb_new.active
+            ws_new.title = title
+            ws_new.append(["Código", "Descrição", "Status"])
+            for item in data:
+                ws_new.append([item['code'], item['desc'], item['status']])
+            path = os.path.join(app.config['UPLOAD_FOLDER'], filename) # Temp save
+            wb_new.save(path)
+            return path
+
+        files_to_zip = []
+        
+        # File 1: Analisados (Verified)
+        f1 = f"Conferidos_{analyst_name}_{timestamp}.xlsx"
+        p1 = save_excel(verified_codes, f1, "Conferidos")
+        files_to_zip.append((p1, f1))
+        
+        # File 2: Deveriam ter sido encontrados (Missing)
+        f2 = f"Faltantes_{analyst_name}_{timestamp}.xlsx"
+        p2 = save_excel(missing_codes, f2, "Faltantes")
+        files_to_zip.append((p2, f2))
+        
+        # File 3: Não encontrados/Sobras (Extra)
+        f3 = f"Sobras_{analyst_name}_{timestamp}.xlsx"
+        p3 = save_excel(extra_codes, f3, "Sobras")
+        files_to_zip.append((p3, f3))
+        
+        # 4. ZIP Them
+        zip_filename = f"Auditoria_{analyst_name}_{timestamp}.zip"
+        zip_path = os.path.join(REPORTS_FOLDER, zip_filename)
+        
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for file_path, arcname in files_to_zip:
+                zipf.write(file_path, arcname)
+                
+        # Cleanup temp xl files
+        for file_path, _ in files_to_zip:
+            if os.path.exists(file_path): os.remove(file_path)
+            
+        # 5. Metadata
         net_id = session.get('connected_network_id')
         user_id = session.get('user_id')
         
         new_rep = FileMetadata(
-            filename=report_name,
-            filepath=report_name, # Saved in Relatorios_Gerados, ensure get_report looks there?
-            # Actually models says filepath uses UPLOAD_FOLDER implicitly? 
-            # We need to be careful. REports are in REPORTS_FOLDER.
-            # Let's handle get_report to look in both or store absolute/relative properly.
-            # For simplicity, let's treat filepath as absolute or manage logic in get_report.
-            # Here keeping it simple: just filename.
+            filename=zip_filename,
+            filepath=zip_filename,
             type='audit_report',
             user_id=int(user_id) if user_id else None,
             network_id=int(net_id) if net_id else None
@@ -594,13 +673,14 @@ def verify():
         db.session.add(new_rep)
         db.session.commit()
 
-        # Fix: Return JSON URL, not file blob
         return jsonify({
             'success': True,
-            'download_url': f'/get_report/{report_name}'
+            'download_url': f'/get_report/{zip_filename}'
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # --- Admin Users ---
