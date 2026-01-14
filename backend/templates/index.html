@@ -338,7 +338,7 @@
                 </section>
 
                 <!-- Manage Masters -->
-                <section class="card">
+                <section class="card hidden" id="admin-file-handling">
                     <div class="card-header">
                         <div class="header-title">
                             <div class="step-number">1</div>
@@ -501,6 +501,7 @@
                 document.getElementById('user-section').classList.add('hidden');
                 document.getElementById('header-actions').classList.remove('hidden');
                 document.getElementById('admin-network-mgmt').classList.remove('hidden');
+                if (document.getElementById('admin-file-handling')) document.getElementById('admin-file-handling').classList.add('hidden');
 
                 // Super Admin Logic
                 if (isSuperAdmin) {
@@ -595,9 +596,13 @@
             currentNetworkId = id;
             document.getElementById('mgmt-status').textContent = `(Gerenciando: ${name})`;
             document.getElementById('mgmt-status').classList.remove('hidden');
-            loadAdminMasters();
-            // Scroll to files
-            document.getElementById('admin-file-handling').scrollIntoView({ behavior: 'smooth' });
+
+            const fileSection = document.getElementById('admin-file-handling');
+            if (fileSection) {
+                fileSection.classList.remove('hidden');
+                loadAdminMasters();
+                fileSection.scrollIntoView({ behavior: 'smooth' });
+            }
         };
 
         // --- City Logic (User) ---
